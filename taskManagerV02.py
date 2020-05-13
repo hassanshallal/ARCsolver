@@ -3,7 +3,6 @@
 from utils import *
 
 
-
 class TaskManager: # works on a task by task level, there are checks and balances
     # initiation must take care of global descriptors of a task 
     def __init__(self, raw_task, phase = 'Training'):
@@ -57,17 +56,64 @@ class TaskManager: # works on a task by task level, there are checks and balance
         else:
             self.deductive_coder0 = None
         
-        # print prelim info about task
+    # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
+    # We have a global tokenizer and a couple tokenizer
+        self.tokenizer_class = self.class_of_tokenizer()
+        #if self.tokenizer_class == 'C':
+        self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
+            
+    
+    # get class: C or G
+    def class_of_tokenizer(self): 
+        # we simply test for a specific case for couple based:
+        global_situation = [get_non_bg_set_situation(x, y, self.bg) for x, y in zip(self.traininputs_vals, self.trainoutputs_vals)]
+        if self.global_bg and all(global_situation):
+            tokenizer_class = 'C'
+        else:
+            tokenizer_class = 'G'
+            
+        return tokenizer_class
+        
+        
+    def tokenize(self):
+        if self.tokenizer_class == 'C':
+            color_to_tokens = [get_col_to_token_class_C(x, y, self.bg) for x, y in zip(self.traininputs_vals, self.trainoutputs_vals)]
+            token_to_colors = [get_token_to_color_class_C(x) for x in color_to_tokens]
+            problem_statements = [get_problem_statement_class_C(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
+            
+            same_color_to_token = all(x == color_to_tokens[0] for x in color_to_tokens)
+            same_problem_statement = all(x == problem_statements[0] for x in problem_statements)
+            if same_color_to_token and same_problem_statement:
+                return color_to_tokens[0], token_to_colors[0], problem_statements[0] 
+            else:
+                print("alert: issue with the logic of finding or labeling couple tokenizations")
+                print(color_to_tokens)
+                print(problem_statements)
+                return color_to_tokens, token_to_colors, problem_statements
+            
+        elif self.tokenizer_class == 'G':
+            print('coming')
+            return {}, {}, [] 
+        
+    # simple print utilities   
+    def brief_task(self):
         print('is_similar_dim: ', self.is_similar_dim,)
         print('input_dims info: ', self.input_dims)
         print('output_dims info: ', self.output_dims)
         print('traininputs_vals: ', self.traininputs_vals)
         print('trainoutputs_vals: ', self.trainoutputs_vals)
+        print('couple_val_map: ', self.couple_val_map)
         print('global_bg: ', self.global_bg)
         print('bg: ', self.bg)
         print('deductive_coder0: ', self.deductive_coder0)
         print('global_value_map: ', self.global_value_map)
-        
+        print("=========")
+        print('information about tokenization:')
+        print('tokenization class: ', self.tokenizer_class)
+        print('color_to_tokens: ', self.color_to_tokens)
+        print('token_to_colors: ', self.token_to_colors)
+        print('problem_statements: ', self.problem_statements)
+        print("=========")
         
     
         

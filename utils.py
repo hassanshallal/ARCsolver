@@ -182,7 +182,6 @@ def get_background(arr):
 # Tests based on prior knowledge
 # process_diff gives insights about the bg and the nonbg
 def process_diff(in_, out_, in_bg):
-
     in_mask = np.where(in_ != in_bg, True, False)
     out_mask = np.where(in_ != out_, True, False)
 
@@ -193,4 +192,50 @@ def process_diff(in_, out_, in_bg):
 
     return sorted(list(overall_set))
 
+
+def get_non_bg_set_situation(in_val_list, out_val_list, bg):    
+    in_val_list = [x for x in in_val_list if x != bg]
+    out_val_list = [x for x in out_val_list if x != bg]
+    in_val_nonbg_set = set(in_val_list)
+    out_val_nonbg_set = set(out_val_list)
+    return in_val_nonbg_set.issubset(out_val_nonbg_set)
+
+
+def get_col_to_token_class_C(in_val_list, out_val_list, bg):
+    in_val_list = [x for x in in_val_list if x != bg]
+    out_val_list = [x for x in out_val_list if x != bg]
+    in_val_nonbg_set = sorted(list(set(in_val_list)))
+    out_val_nonbg_set = sorted(list(set(out_val_list)))
+    
+    # get your vol_to_token and token_to_col
+    col_to_token = {}
+    col_to_token[bg] = 'bg'
+    
+    for n in range(len(in_val_nonbg_set)):
+        if in_val_nonbg_set[n] not in col_to_token.keys():
+            col_to_token[in_val_nonbg_set[n]] = 'nonbg' + str(n)
+    
+    for n in range(len(out_val_nonbg_set)):
+        if out_val_nonbg_set[n] not in col_to_token.keys():
+            cur_len = len(col_to_token)
+            col_to_token[out_val_nonbg_set[n]] = 'nonbg' + str(cur_len - 1)
+    
+    return col_to_token
+
+
+def get_token_to_color_class_C(col_to_token):
+    return {v: k for k, v in col_to_token.items()}
+
+
+def get_problem_statement_class_C(col_to_token, couple_value_map):
+    problem_statement = []
+    for k, v in couple_value_map.items():
+        value_list = sorted(list(v))
+        for n in value_list:
+            problem_statement.append((col_to_token[k], col_to_token[n]))
+            
+    return sorted(problem_statement)
+
+
+# def get_col_to_token_class_G(in_val_lists, out_val_lists, bg):
 
