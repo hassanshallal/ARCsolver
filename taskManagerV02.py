@@ -1,7 +1,7 @@
 # Be subtle and abstract
 # lists are the container we will use to handle different couples, etc
 from utils import *
-from deductiveV02 import *
+
 
 
 class TaskManager: # works on a task by task level, there are checks and balances
@@ -27,8 +27,15 @@ class TaskManager: # works on a task by task level, there are checks and balance
         
         # background
         self.traininputs_bg = [get_background(n) for n in self.traininputs]
+        traininputs_bg_set = set(self.traininputs_bg)
+        if len(traininputs_bg_set) == 1:
+            self.global_input_bg = traininputs_bg_set.pop()
+        else:
+            self.global_input_bg = None
+        
         self.trainoutputs_bg = [get_background(n) for n in self.trainoutputs]
         self.couple_same_bg = [n == m for n, m in zip(self.traininputs_bg, self.trainoutputs_bg)]
+        
         
         self.bg_global_set = set(self.traininputs_bg + self.trainoutputs_bg)
         if len(self.bg_global_set) == 1:
@@ -40,10 +47,11 @@ class TaskManager: # works on a task by task level, there are checks and balance
            
         
         # Move into deduction saver 0
-        if self.is_similar_dim and self.global_bg:
-            situation_set  = set([process_diff(n, m, self.bg) for n, m in zip(self.traininputs, self.trainoutputs)])
+        if self.is_similar_dim and self.global_input_bg != None:
+            situation  = [process_diff(n, m, self.global_input_bg) for n, m in zip(self.traininputs, self.trainoutputs)]
+            situation_set  = set([str(tuple(n)) for n in situation])
             if len(situation_set) == 1:
-                self.deductive_coder0 = situation_set.pop()
+                self.deductive_coder0 = situation[0]
             else:
                 self.deductive_coder0 = None
         else:
@@ -61,7 +69,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
         print('global_value_map: ', self.global_value_map)
         
         
-        
+    
         
         
         

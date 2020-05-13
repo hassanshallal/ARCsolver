@@ -7,6 +7,11 @@ from matplotlib import colors
 
 import numpy as np
 
+
+from deductiveV02 import *
+
+
+
 # This utils.py is not supposed to be related to any logic
 
 # This is to serialize the opjects
@@ -186,6 +191,6 @@ def process_diff(in_, out_, in_bg):
         for m in range(in_mask.shape[1]):
             overall_set.add(coder0[saver0[(in_mask[n, m], out_mask[n, m])]])
 
-    return str(sorted(list(overall_set)))
+    return sorted(list(overall_set))
 
 
