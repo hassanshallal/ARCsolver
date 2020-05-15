@@ -117,7 +117,7 @@ def plot_task(task, plot_test=False):
     plt.tight_layout()
     plt.show()
 
-    
+
 ## instantiation of a task manager utilities
 def explore_dim_arrays(list_of_arrays):
     dim_zero_min = min([n.shape[0] for n in list_of_arrays])
@@ -126,30 +126,48 @@ def explore_dim_arrays(list_of_arrays):
     dim_one_min = min([n.shape[1] for n in list_of_arrays])
     dim_one_max = max([n.shape[1] for n in list_of_arrays])
     dim_one_range = dim_one_max - dim_one_min
-    
+
     return [(dim_zero_min, dim_zero_max, dim_zero_range), (dim_one_min, dim_one_max, dim_one_range)]
 
-    
+
 def explore_dimensions(traininputs, trainoutputs):
     is_similar_dim = all([n.shape == m.shape for n, m in zip(traininputs, trainoutputs)])
     input_dims = explore_dim_arrays(traininputs)
     output_dims = explore_dim_arrays(trainoutputs)
-        
+
     return is_similar_dim, input_dims, output_dims
-    
-    
+
+
 def get_value_map(in_, out_):
     target_indices = np.argwhere(in_ != out_)
     value_map = {}
-    
+
     # we can't get a value map unless the shapes are equal
     if in_.shape == out_.shape:
         for n in target_indices:
             if in_[n[0], n[1]] not in value_map.keys():
                 value_map[in_[n[0], n[1]]] = set()
             value_map[in_[n[0], n[1]]].add(out_[n[0], n[1]])
-    
+
     return value_map
+
+def get_target_values(value_map):
+    all_values = []
+    for k, v in value_map.items():
+        all_values = all_values + list(v)
+
+    all_values = np.array(all_values)
+    val_set = set(all_values)
+    return val_set
+
+def get_target_distribution(value_map):
+    all_values = []
+    for k, v in value_map.items():
+        all_values = all_values + list(v)
+
+    all_values = np.array(all_values)
+    val_freq = np.bincount(all_values)
+    return val_freq
 
 def get_global_value_map(list_of_value_maps):
     global_vm = {}
@@ -160,7 +178,7 @@ def get_global_value_map(list_of_value_maps):
             if len(value) > 0:
                 for m in value:
                     global_vm[key].add(m)
-            
+
     return global_vm
 
 
@@ -172,13 +190,13 @@ nbh = lambda x, i, j: { #x is array, i and j are row and column indices
             if (0 <= i < x.shape[0]) and (0 <= j < x.shape[1]) and (0 <= i+ip < x.shape[0]) and (0 <= j+jp < x.shape[1])
 }
 
-# get a background 
+# get a background
 def get_background(arr):
     bincount = np.bincount(arr.flatten())
     major = bincount.argmax()
     return major
 
- 
+
 # Tests based on prior knowledge
 # process_diff gives insights about the bg and the nonbg
 def process_diff(in_, out_, in_bg):
@@ -192,8 +210,20 @@ def process_diff(in_, out_, in_bg):
 
     return sorted(list(overall_set))
 
+def process_diff_spatial(in_, out_, in_bg):
+    in_mask = np.where(in_ != in_bg, True, False)
+    out_mask = np.where(in_ != out_, True, False)
+    out_extend_mask = np.where((in_ != out_) & (in_ != in_bg) & ( out_ != in_bg), True, False)
 
-def get_non_bg_set_situation(in_val_list, out_val_list, bg):    
+    overall_set = set()
+    for n in range(in_mask.shape[0]):
+        for m in range(in_mask.shape[1]):
+            overall_set.add(coder1[saver1[(in_mask[n, m], out_mask[n, m], out_extend_mask[n, m])]])
+
+    return sorted(list(overall_set))
+
+
+def get_non_bg_set_situation(in_val_list, out_val_list, bg):
     in_val_list = [x for x in in_val_list if x != bg]
     out_val_list = [x for x in out_val_list if x != bg]
     in_val_nonbg_set = set(in_val_list)
@@ -201,25 +231,33 @@ def get_non_bg_set_situation(in_val_list, out_val_list, bg):
     return in_val_nonbg_set.issubset(out_val_nonbg_set)
 
 
-def get_col_to_token_class_C(in_val_list, out_val_list, bg):
+def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg):
     in_val_list = [x for x in in_val_list if x != bg]
     out_val_list = [x for x in out_val_list if x != bg]
     in_val_nonbg_set = sorted(list(set(in_val_list)))
     out_val_nonbg_set = sorted(list(set(out_val_list)))
-    
+
+    nonbg_target_val_set = get_target_values(couple_val_map)
+
     # get your vol_to_token and token_to_col
     col_to_token = {}
     col_to_token[bg] = 'bg'
-    
+
+    #print(col_to_token)
     for n in range(len(in_val_nonbg_set)):
-        if in_val_nonbg_set[n] not in col_to_token.keys():
-            col_to_token[in_val_nonbg_set[n]] = 'nonbg' + str(n)
-    
-    for n in range(len(out_val_nonbg_set)):
-        if out_val_nonbg_set[n] not in col_to_token.keys():
+        #print('A')
+        if in_val_nonbg_set[n] not in col_to_token.keys() and (in_val_nonbg_set[n] in nonbg_target_val_set or in_val_nonbg_set[n] in couple_val_map.keys()): #we are focusing on what changes
             cur_len = len(col_to_token)
-            col_to_token[out_val_nonbg_set[n]] = 'nonbg' + str(cur_len - 1)
-    
+            col_to_token[in_val_nonbg_set[n]] = 'nonbg' + str(cur_len-1)
+            #print(col_to_token)
+
+    for n in range(len(out_val_nonbg_set)):
+        #print('B')
+        if out_val_nonbg_set[n] not in col_to_token.keys() and (out_val_nonbg_set[n] in nonbg_target_val_set or out_val_nonbg_set[n] in couple_val_map.keys()):
+            cur_len = len(col_to_token)
+            col_to_token[out_val_nonbg_set[n]] = 'nonbg' + str(cur_len-1)
+            #print(col_to_token)
+
     return col_to_token
 
 
@@ -228,14 +266,21 @@ def get_token_to_color_class_C(col_to_token):
 
 
 def get_problem_statement_class_C(col_to_token, couple_value_map):
+#     print('col_to_token is:' , col_to_token)
+#     print('couple_value_map is: ', couple_value_map)
+
     problem_statement = []
     for k, v in couple_value_map.items():
         value_list = sorted(list(v))
+#         print('k is: ', str(k))
+#         print(value_list)
         for n in value_list:
+#             print(n)
+#             print(col_to_token[k])
+#             print(col_to_token[n])
             problem_statement.append((col_to_token[k], col_to_token[n]))
-            
+
     return sorted(problem_statement)
 
 
 # def get_col_to_token_class_G(in_val_lists, out_val_lists, bg):
-

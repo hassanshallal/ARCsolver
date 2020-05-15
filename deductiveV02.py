@@ -26,7 +26,7 @@ from z3 import Optimize, solve, Solver, Function, Goal, Tactic, solve_using, Pro
 # This seems sort of deductive but its interesting
 
 # This function finds logical operattors that represent a pixel change in regards to background and input-to-output transformation
-def logical_screen_0(in_, out_):  
+def logical_screen_0(in_, out_):
     x, y = Bools('x y')
     x = True if in_ else False
     y = True if out_ else False
@@ -56,5 +56,41 @@ coder0[saver0[(True, False)]] = 'nonbg_S'
 coder0[saver0[(False, True)]] = 'bg_C'
 coder0[saver0[(False, False)]] = 'bg_S'
 
+# in_mask = np.where(in_ != in_bg, True, False)
+# out_mask = np.where(in_ != out_, True, False)
+# out_extend_mask = np.where(in_ != out_ and in_ != in_bg and out_ != in_bg, True, False)
+def logical_screen_1(in_, out_, out_extend_):  # out_extend:
+    x, y, z = Bools('x y z')
+    x = True if in_ else False
+    y = True if out_ else False
+    z = True if out_extend_ else False
+
+    chosen = []
+    for m in [And(x, y), Or(x, y), Xor(x, y), Implies(x, y), Not(x), Not(y), And(And(x, y), z), And(And(x, y), Not(z))]:
+        s = Solver()
+        s.add(Not(m))
+        if s.check() == z3.z3.unsat:
+            l = str(m).split('(')
+            if len(l) == 2:
+                chosen.append(l[0])
+            elif len(l) > 2:
+                if 'Not' in l[2]:
+                    chosen.append(l[0]+'Not')
+                else:
+                    chosen.append(l[0]+'And')
+    return tuple(chosen)
 
 
+saver1 = {}
+saver1[(True, True, True)] = logical_screen_1(True, True, True)
+saver1[(True, True, False)] = logical_screen_1(True, True, False)
+saver1[(True, False, False)] = logical_screen_1(True, False, False)
+saver1[(False, True, False)] = logical_screen_1(False, True, False)
+saver1[(False, False, False)] = logical_screen_1(False, False, False)
+
+coder1 = {}
+coder1[saver1[(True, True, True)]] = 'nonbg_C_nonbg'
+coder1[saver1[(True, True, False)]] = 'nonbg_C_bg'
+coder1[saver1[(True, False, False)]] = 'nonbg_S'
+coder1[saver1[(False, True, False)]] = 'bg_C'
+coder1[saver1[(False, False, False)]] = 'bg_S'
