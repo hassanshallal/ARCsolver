@@ -1,5 +1,6 @@
 import os
 import pickle
+from copy import deepcopy
 import json
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -138,18 +139,30 @@ def explore_dimensions(traininputs, trainoutputs):
     return is_similar_dim, input_dims, output_dims
 
 
-def get_value_map(in_, out_):
-    target_indices = np.argwhere(in_ != out_)
+def get_value_map(in_, out_): # for cells that change
     value_map = {}
-
     # we can't get a value map unless the shapes are equal
     if in_.shape == out_.shape:
+        target_indices = np.argwhere(in_ != out_)
         for n in target_indices:
             if in_[n[0], n[1]] not in value_map.keys():
                 value_map[in_[n[0], n[1]]] = set()
             value_map[in_[n[0], n[1]]].add(out_[n[0], n[1]])
 
     return value_map
+
+def get_similars(in_, out_): # for cells that stay
+    value_map = {}
+    # we can't get a value map unless the shapes are equal
+    if in_.shape == out_.shape:
+        target_indices = np.argwhere(in_ == out_)
+        for n in target_indices:
+            if in_[n[0], n[1]] not in value_map.keys():
+                value_map[in_[n[0], n[1]]] = set()
+            value_map[in_[n[0], n[1]]].add(out_[n[0], n[1]])
+
+    return value_map
+
 
 def get_target_values(value_map):
     all_values = []
@@ -281,6 +294,9 @@ def get_problem_statement_class_C(col_to_token, couple_value_map):
             problem_statement.append((col_to_token[k], col_to_token[n]))
 
     return sorted(problem_statement)
+
+
+
 
 
 # def get_col_to_token_class_G(in_val_lists, out_val_lists, bg):

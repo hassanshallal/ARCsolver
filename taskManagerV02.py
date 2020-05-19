@@ -23,25 +23,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.trainoutputs_vals = [np.unique(n).tolist() for n in self.trainoutputs]
         self.couple_val_map = [get_value_map(n, m) for n, m in zip(self.traininputs, self.trainoutputs)] # needs further work
         self.global_value_map = get_global_value_map(self.couple_val_map)
+        self.couple_similars = [get_similars(n, m) for n, m in zip(self.traininputs, self.trainoutputs)] # needs further work
+        self.global_similars = get_global_value_map(self.couple_similars)
         #print('global_value_map is: ', self.global_value_map)
-
-        # background treatment:
-        # we changed the strategy to focus only on input background
-        # self.traininputs_bg = [get_background(n) for n in self.traininputs]
-        # traininputs_bg_set = set(self.traininputs_bg)
-        # if len(traininputs_bg_set) == 1:
-        #     self.global_input_bg = traininputs_bg_set.pop()
-        # else:
-        #     self.global_input_bg = None
-        #self.trainoutputs_bg = [get_background(n) for n in self.trainoutputs]
-        #self.couple_same_bg = [n == m for n, m in zip(self.traininputs_bg, self.trainoutputs_bg)]
-        # self.bg_global_set = set(self.traininputs_bg + self.trainoutputs_bg)
-        # if len(self.bg_global_set) == 1:
-        #     self.global_bg = True
-        #     self.bg = self.bg_global_set.pop()
-        # else:
-        #     self.global_bg = False
-        #     self.bg = list(self.bg_global_set)
 
         self.traininputs_bg = [get_background(n) for n in self.traininputs]
         traininputs_bg_set = set(self.traininputs_bg)
@@ -84,18 +68,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
         #if self.tokenizer_class == 'C':
         self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
 
-
-#     # get class: C or G
-#     def class_of_tokenizer(self):
-#         # we simply test for a specific case for couple based:
-#         global_situation = [get_non_bg_set_situation(x, y, self.bg) for x, y in zip(self.traininputs_vals, self.trainoutputs_vals)]
-#         if self.global_bg and all(global_situation):
-#             tokenizer_class = 'C'
-#         else:
-#             tokenizer_class = 'G'
-
-#         return tokenizer_class
-
+        self.problem_graph = self.express_problem_graph()
 
     def tokenize(self):
         if self.is_similar_dim and self.global_bg: #self.tokenizer_class == 'C':
@@ -104,17 +77,39 @@ class TaskManager: # works on a task by task level, there are checks and balance
             problem_statements = [get_problem_statement_class_C(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
 
             #same_color_to_token = all(x == color_to_tokens[0] for x in color_to_tokens)
-            same_problem_statement = all(x == problem_statements[0] for x in problem_statements)
+            #same_problem_statement = all(x == problem_statements[0] for x in problem_statements)
 
-            if  same_problem_statement:
-                print('Found ONE code: ', problem_statements[0])
-                return color_to_tokens[0], token_to_colors[0], problem_statements[0]
-            else:
-                print('Found multiple codes: ', problem_statements)
-                return color_to_tokens, token_to_colors, problem_statements
+            #if same_problem_statement:
+                #print('Found ONE code: ', problem_statements[0])
+                #return color_to_tokens[0], token_to_colors[0], problem_statements[0]
+            #else:
+            consensus_color_to_tokens = max(list(color_to_tokens), key = color_to_tokens.count)
+            consensus_token_to_colors = max(list(token_to_colors), key = token_to_colors.count)
+            consensus_problem_statements = max(list(problem_statements), key = problem_statements.count)
+            return consensus_color_to_tokens, consensus_token_to_colors, consensus_problem_statements
+            
         else:
-            print('coming')
+            print('coming soon in a different taste baby!')
             return {}, {}, []
+
+    def express_problem_graph(self):
+        if len(self.problem_statements) > 0 and type(self.problem_statements[0]) == tuple:
+            problem_graph = deepcopy(self.problem_statements)
+            for n in self.global_similars.keys():
+                if n in self.color_to_tokens.keys():
+                    problem_graph.append((self.color_to_tokens[n], self.color_to_tokens[n]))
+                else:
+                    if all([n in m for m in self.traininputs]) and all([n in m for m in self.trainoutputs]):
+                        problem_graph.append((n, n)) # this may be a relevant anchor nonbg
+                    #or a problematic redundanct mis-re-tokenization! (should be removed now)
+                    # this last condition made all the difference because now by default,
+                    # the system is most likely aware with only where the action is,
+                    # excellent job man, excellent job.
+            return problem_graph
+        else:
+            return ['ARCsolver doesn not have a clear problem statment yet.']
+
+
 
     # simple print utilities
     def brief_task(self):
@@ -134,5 +129,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
         #print('tokenization class: ', self.tokenizer_class)
         print('color_to_tokens: ', self.color_to_tokens)
         print('token_to_colors: ', self.token_to_colors)
-        #print('problem_statements: ', self.problem_statements)
+        print('problem_statements: ', self.problem_statements)
+        print('problem_graph: ', self.problem_graph)
         print("=========")
