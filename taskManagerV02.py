@@ -87,9 +87,8 @@ class TaskManager: # works on a task by task level, there are checks and balance
             consensus_token_to_colors = max(list(token_to_colors), key = token_to_colors.count)
             consensus_problem_statements = max(list(problem_statements), key = problem_statements.count)
             return consensus_color_to_tokens, consensus_token_to_colors, consensus_problem_statements
-            
         else:
-            print('coming soon in a different taste baby!')
+            print('coming soon in a different taste!')
             return {}, {}, []
 
     def express_problem_graph(self):
