@@ -312,6 +312,18 @@ def is_only_one_nonbg_per_couple(traininputs_vals, trainoutputs_vals, bg):
 
     return len_check
 
+def is_same_nonbgs_per_couple(traininputs_vals, trainoutputs_vals, bg):
+    traininputs_vals_here = deepcopy(traininputs_vals)
+    trainoutputs_vals_here = deepcopy(trainoutputs_vals)
+    for n in range(len(traininputs_vals_here)):
+        traininputs_vals_here[n] = [x for x in traininputs_vals_here[n] if x != bg]
+    for n in range(len(trainoutputs_vals_here)):
+        trainoutputs_vals_here[n] = [x for x in trainoutputs_vals_here[n] if x != bg]
+
+    len_check = all([x == y for x, y in zip(traininputs_vals_here, trainoutputs_vals_here)])
+
+    return len_check
+
 
 
 
