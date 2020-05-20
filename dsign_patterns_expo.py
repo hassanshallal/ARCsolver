@@ -64,9 +64,10 @@ class HorizontalSBDecorator(AbstractWindowDecorator):
         self._window.build()
 
 # The interpreter pattern is behavioral for advanced grammer and DSL.
-class Expression:
-    def interpret(self, text): pass
 
+class Expression:
+    def interpret(self, problem_graph):
+        pass
 
 class TerminalExpression(Expression):
     def __init__(self, word):

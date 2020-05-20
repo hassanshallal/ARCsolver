@@ -295,6 +295,22 @@ def get_problem_statement_class_C(col_to_token, couple_value_map):
 
     return sorted(problem_statement)
 
+def get_num_nonbg(token_to_colors):
+    keys = list(token_to_colors.keys())
+    nonbg_keys = ['nonbg' in x for x in keys]
+    return len([x for x in nonbg_keys if x])
+
+def is_only_one_nonbg_per_couple(traininputs_vals, trainoutputs_vals, bg):
+    traininputs_vals_here = deepcopy(traininputs_vals)
+    trainoutputs_vals_here = deepcopy(trainoutputs_vals)
+    for n in range(len(traininputs_vals_here)):
+        traininputs_vals_here[n] = [x for x in traininputs_vals_here[n] if x != bg]
+    for n in range(len(trainoutputs_vals_here)):
+        trainoutputs_vals_here[n] = [x for x in trainoutputs_vals_here[n] if x != bg]
+
+    len_check = all([len(x) == 1 and len(y) == 1 and x[0] == y[0] for x, y in zip(traininputs_vals_here, trainoutputs_vals_here)])
+
+    return len_check
 
 
 
