@@ -82,10 +82,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
             else:
                 print('Found MULTIPLE codes: ')
                 return color_to_tokens, token_to_colors, problem_statements
-            # consensus_color_to_tokens = max(list(color_to_tokens), key = color_to_tokens.count)
-            # consensus_token_to_colors = max(list(token_to_colors), key = token_to_colors.count)
-            # consensus_problem_statements = max(list(problem_statements), key = problem_statements.count)
-            # return consensus_color_to_tokens, consensus_token_to_colors, consensus_problem_statements
         else:
             print('coming soon in a different taste!')
             return {}, {}, []
@@ -96,7 +92,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
             if n in color_to_tokens.keys():
                 problem_graph.append((color_to_tokens[n], color_to_tokens[n]))
             else:
-                if all([n in m for m in self.traininputs]) and all([n in m for m in self.trainoutputs]):
+                if any([n in m for m in self.traininputs]) and any([n in m for m in self.trainoutputs]):
                     problem_graph.append((n, n)) # this is a relevant anchor nonbg
                 # elif get_num_nonbg(token_to_colors) == 1 and is_only_one_nonbg_per_couple(self.traininputs_vals, self.trainoutputs_vals, self.bg):
                 #     if type(token_to_colors['nonbg0']) == int:
@@ -252,3 +248,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
             #                 target_indices = np.argwhere((in_ == m[0]) & (out_ == m[1]))
             #                 coordinates.append(target_indices)
             # return coordinates
+
+# Simplification is the way to victory
+            # consensus_color_to_tokens = max(list(color_to_tokens), key = color_to_tokens.count)
+            # consensus_token_to_colors = max(list(token_to_colors), key = token_to_colors.count)
+            # consensus_problem_statements = max(list(problem_statements), key = problem_statements.count)
+            # return consensus_color_to_tokens, consensus_token_to_colors, consensus_problem_statements
