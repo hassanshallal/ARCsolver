@@ -281,7 +281,6 @@ def get_token_to_color_class_C(col_to_token):
 def get_problem_statement_class_C(col_to_token, couple_value_map):
 #     print('col_to_token is:' , col_to_token)
 #     print('couple_value_map is: ', couple_value_map)
-
     problem_statement = []
     for k, v in couple_value_map.items():
         value_list = sorted(list(v))
@@ -324,7 +323,17 @@ def is_same_nonbgs_per_couple(traininputs_vals, trainoutputs_vals, bg):
 
     return len_check
 
+def is_same_nonbgs_per_couple(traininputs_vals, trainoutputs_vals, bg):
+    traininputs_vals_here = deepcopy(traininputs_vals)
+    trainoutputs_vals_here = deepcopy(trainoutputs_vals)
+    for n in range(len(traininputs_vals_here)):
+        traininputs_vals_here[n] = [x for x in traininputs_vals_here[n] if x != bg]
+    for n in range(len(trainoutputs_vals_here)):
+        trainoutputs_vals_here[n] = [x for x in trainoutputs_vals_here[n] if x != bg]
 
+    len_check = all([x == y for x, y in zip(traininputs_vals_here, trainoutputs_vals_here)])
+
+    return len_check
 
 
 # def get_col_to_token_class_G(in_val_lists, out_val_lists, bg):
