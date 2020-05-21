@@ -336,4 +336,53 @@ def is_same_nonbgs_per_couple(traininputs_vals, trainoutputs_vals, bg):
     return len_check
 
 
-# def get_col_to_token_class_G(in_val_lists, out_val_lists, bg):
+def get_coordinates_of_tuple(x, in_, out_):
+    if type(in_) == list:
+        coordinates = []
+        for n in range(len(in_)):
+            this_in_ = in_[n]
+            this_out_ = out_[n]
+            target_indices = np.argwhere((this_in_ == x[0]) & (this_out_ == x[1]))
+            coordinates.append(target_indices)
+        return coordinates
+    else:
+        target_indices = np.argwhere((in_ == x[0]) & (out_ == x[1]))
+        return [target_indices]
+
+def retokenize(x, token_to_colors):
+    if x[0] in token_to_colors.keys() and x[1] in token_to_colors.keys():
+        if type(token_to_colors[x[0]]) == int and type(token_to_colors[x[1]]) == int:
+            return(token_to_colors[x[0]], token_to_colors[x[1]])
+    else:
+        return ['Issue with retokenization.']
+
+def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_):
+     # specificaaly pick indices and tuples by category: int_anchor, token_anchor, difference
+    int_anchors_indices = [i for i, val in enumerate(problem_graph) if val[0] not in token_to_colors.keys()]
+    int_anchors = [problem_graph[x] for x in int_anchors_indices]
+
+    token_anchors_indices = [i for i, val in enumerate(problem_graph) if val[0] == val[1] and type(val[0]) == str]
+    token_anchors = [problem_graph[x] for x in token_anchors_indices]
+
+    differences_indices = [i for i, val in enumerate(problem_graph) if val[0] != val[1] and type(val[0]) == str]
+    differences = [problem_graph[x] for x in differences_indices]
+    # set generation with cooridinates in all couples
+    assignments_leads = sorted(list(set([x[0] for x in differences])))
+    num_assignemnts  = len(assignments_leads)
+    asssignments_output = []
+
+    for n in range(num_assignemnts):
+        this_assignemnt = {}
+        for x in int_anchors:
+            this_assignemnt[('int_anchor', x)] = get_coordinates_of_tuple(x, in_, out_)
+        for x in token_anchors:
+            if x[0] == assignments_leads[n]:
+                this_assignemnt[('token_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
+            elif x[0] != assignments_leads[n]:
+                this_assignemnt[('token_anchor_nonlead', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
+        for x in differences:
+            if x[0] == assignments_leads[n]:
+                this_assignemnt[('diff_lead', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
+        asssignments_output.append(this_assignemnt)
+
+    return assignments_leads, asssignments_output
