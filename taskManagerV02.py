@@ -130,7 +130,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
             if type(token_to_colors[x[0]]) == int and type(token_to_colors[x[1]]) == int:
                 return(token_to_colors[x[0]], token_to_colors[x[1]])
         else:
-            return 'Issue with retokenization.'
+            return ['Issue with retokenization.']
 
     def generate_set_assignemtns_per_graph(self, problem_graph, token_to_colors, in_, out_):
          # specificaaly pick indices and tuples by category: int_anchor, token_anchor, difference
@@ -150,13 +150,15 @@ class TaskManager: # works on a task by task level, there are checks and balance
         for n in range(num_assignemnts):
             this_assignemnt = {}
             for x in int_anchors:
-                this_assignemnt[x] = self.get_coordinates_of_tuple(x, in_, out_)
+                this_assignemnt[('int_anchor', x)] = self.get_coordinates_of_tuple(x, in_, out_)
             for x in token_anchors:
                 if x[0] == assignments_leads[n]:
-                    this_assignemnt[x] = self.get_coordinates_of_tuple(self.retokenize(x, token_to_colors), in_, out_)
+                    this_assignemnt[('token_anchor_lead', x)] = self.get_coordinates_of_tuple(self.retokenize(x, token_to_colors), in_, out_)
+                elif x[0] != assignments_leads[n]:
+                    this_assignemnt[('token_anchor_nonlead', x)] = self.get_coordinates_of_tuple(self.retokenize(x, token_to_colors), in_, out_)
             for x in differences:
                 if x[0] == assignments_leads[n]:
-                    this_assignemnt[x] = self.get_coordinates_of_tuple(self.retokenize(x, token_to_colors), in_, out_)
+                    this_assignemnt[('diff_lead', x)] = self.get_coordinates_of_tuple(self.retokenize(x, token_to_colors), in_, out_)
             asssignments_output.append(this_assignemnt)
 
         return assignments_leads, asssignments_output
@@ -173,7 +175,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 asssignments_output.append(results[n][1])
             return assignments_leads, asssignments_output
         else:
-            return ['ARCsolver doesn can not generate sets out fo the problem graph yet.']
+            return ['ARCsolver doesn can not generate sets out fo the problem graph yet.'], ['This requires a different mindset!']
 
     # simple print utilities
     def brief_task(self):
