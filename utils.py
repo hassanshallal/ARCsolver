@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib import colors
-
+from itertools import permutations
 import numpy as np
 
 
@@ -76,6 +76,23 @@ def get_training(raw_task):
 
         assert len(traininputs) == len(trainoutputs)
         return traininputs, trainoutputs
+
+def get_testing(raw_task):
+        testing = raw_task['test']
+        num_test = len(testing)
+
+        # prepare
+        testinputs = []
+        testoutputs = []
+
+        for m in range(num_test):
+            this_input = fix_dim(testing[m]['input'])
+            testinputs.append(this_input)
+            if 'output' in testing[m].keys() and len(testing[m]['output']) > 0:
+                this_output = fix_dim(testing[m]['output'])
+                testoutputs.append(this_output)
+        #assert len(traininputs) == len(trainoutputs)
+        return testinputs, testoutputs
 
 
 # plotting a task
@@ -374,15 +391,15 @@ def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_
     for n in range(num_assignemnts):
         this_assignemnt = {}
         for x in int_anchors:
-            this_assignemnt[('int_anchor', x)] = get_coordinates_of_tuple(x, in_, out_)
+            this_assignemnt[('int_nonanchor', x)] = get_coordinates_of_tuple(x, in_, out_)
         for x in token_anchors:
             if x[0] == assignments_leads[n]:
                 this_assignemnt[('token_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
             elif x[0] != assignments_leads[n]:
-                this_assignemnt[('token_anchor_nonlead', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
+                this_assignemnt[('token_nonanchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
         for x in differences:
             if x[0] == assignments_leads[n]:
-                this_assignemnt[('diff_lead', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
+                this_assignemnt[('diff_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
         asssignments_output.append(this_assignemnt)
 
     return assignments_leads, asssignments_output

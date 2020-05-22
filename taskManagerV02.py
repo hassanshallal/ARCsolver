@@ -4,29 +4,30 @@ from utils import *
 
 class TaskManager: # works on a task by task level, there are checks and balances
     # initiation defines several data members and uses class methods so as to output a problem graph
-    def __init__(self, raw_task, phase = 'Training'):
+    def __init__(self, raw_task):
         self.raw_task = raw_task
         self.num_train = len(raw_task['train'])
-        self.phase = phase
+        self.num_test = len(raw_task['test'])
 
-        if self.phase == 'Training': # both training and evaluation
-            self.traininputs, self.trainoutputs = get_training(raw_task) # this will return two lists for inputs and outputs
-        else:
-            raise NameError("Current option is only 'Training'")
+        self.traininputs, self.trainoutputs = get_training(raw_task) # this will return two lists for inputs and outputs
+        self.testinputs, self.testoutputs = get_testing(raw_task)
 
-        # gather general information about the dimensionality
+        # gather general information about the dimensionality from training
         self.is_similar_dim, self.input_dims, self.output_dims = explore_dimensions(self.traininputs, self.trainoutputs)
-
-        # get list of lists of values in inputs, outputs
         self.traininputs_vals = [np.unique(n).tolist() for n in self.traininputs]
         self.trainoutputs_vals = [np.unique(n).tolist() for n in self.trainoutputs]
         self.couple_val_map = [get_value_map(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
         self.global_value_map = get_global_value_map(self.couple_val_map)
         self.couple_similars = [get_similars(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
         self.global_similars = get_global_value_map(self.couple_similars)
-        #print('global_value_map is: ', self.global_value_map)
+
+        # prepare relevant info for your tests conditionally on presence of testoutputs
+        self.testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
 
         self.traininputs_bg = [get_background(n) for n in self.traininputs]
+        self.testinputs_bg = [get_background(n) for n in self.testinputs]
+
+
         traininputs_bg_set = set(self.traininputs_bg)
         if len(traininputs_bg_set) == 1:
             self.global_bg = True
@@ -149,4 +150,5 @@ class TaskManager: # works on a task by task level, there are checks and balance
                         print(k, ' : ', str([len(l) for l in v]))
                     print("end of assignment.")
                 print("end of an option :).")
+        print(self.traininputs)
         print("=========")
