@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from itertools import permutations
+from itertools import permutations, combinations
 import numpy as np
 
 
@@ -111,11 +111,7 @@ def plot_task(task, plot_test=False):
     else:
         fig_dim = train_len*2
     fig, axs = plt.subplots(1, fig_dim, figsize=(fig_dim + 10,  fig_dim + 10))
-    # 0 --> 0, 1,
-    # 1 --> 2, 3
-    # 2 --> 4, 5
 
-    # 4 --> 8, 9
     for n in range(train_len):
         axs[2*n].imshow(task['train'][n]['input'], cmap=cmap, norm=norm)
         axs[2*n].axis('off')
@@ -135,6 +131,55 @@ def plot_task(task, plot_test=False):
     plt.tight_layout()
     plt.show()
 
+def plot_task_eval(task, testpreds):
+    """
+    Plots the first train and test pairs of a specified task,
+    using same color scheme as the ARC app
+    """
+    cmap = colors.ListedColormap(
+        ['#000000', '#0074D9', '#FF4136', '#2ECC40', '#FFDC00',
+         '#AAAAAA', '#F012BE', '#FF851B', '#7FDBFF', '#870C25'])
+    norm = colors.Normalize(vmin=0, vmax=9)
+    train_len = len(task['train'])
+    test_len = len(task['test'])
+
+    fig_dim = 0
+    if type(testpreds) == list:
+        fig_dim = train_len*2 + test_len*3
+    elif type(testpreds) == dict:
+        fig_dim = train_len*2 + (test_len*2 + len(testpreds))
+
+    #print(fig_dim)
+    fig, axs = plt.subplots(1, fig_dim, figsize=(fig_dim + 10,  fig_dim + 10))
+
+    for n in range(train_len):
+        axs[2*n].imshow(task['train'][n]['input'], cmap=cmap, norm=norm)
+        axs[2*n].axis('off')
+        axs[2*n].set_title('Train ' + str(n) + ' Input')
+        axs[2*n+1].imshow(task['train'][n]['output'], cmap=cmap, norm=norm)
+        axs[2*n+1].axis('off')
+        axs[2*n+1].set_title('Train ' + str(n) + ' output')
+
+    for n in range(test_len):
+        axs[train_len*2].imshow(task['test'][n]['input'], cmap=cmap, norm=norm)
+        axs[train_len*2].axis('off')
+        axs[train_len*2].set_title('Test Input')
+        axs[train_len*2 + 1].imshow(task['test'][n]['output'], cmap=cmap, norm=norm)
+        axs[train_len*2 + 1].axis('off')
+        axs[train_len*2 + 1].set_title('Test Output')
+        if type(testpreds) == list:
+            axs[train_len*2 + 2].imshow(testpreds[n], cmap=cmap, norm=norm)
+            axs[train_len*2 + 2].axis('off')
+            axs[train_len*2 + 2].set_title('Our prediction')
+        elif type(testpreds) == dict:
+            iter = 0
+            for k, v in testpreds.items():
+                axs[train_len*2 + 2 + iter].imshow(testpreds[k][1][0], cmap=cmap, norm=norm)
+                axs[train_len*2 + 2 + iter].axis('off')
+                axs[train_len*2 + 2 + iter].set_title(k)
+                iter += 1
+    plt.tight_layout()
+    plt.show()
 
 ## instantiation of a task manager utilities
 def explore_dim_arrays(list_of_arrays):
@@ -391,12 +436,12 @@ def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_
     for n in range(num_assignemnts):
         this_assignemnt = {}
         for x in int_anchors:
-            this_assignemnt[('int_nonanchor', x)] = get_coordinates_of_tuple(x, in_, out_)
+            this_assignemnt[('int_anchor', x)] = get_coordinates_of_tuple(x, in_, out_)
         for x in token_anchors:
             if x[0] == assignments_leads[n]:
                 this_assignemnt[('token_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
-            elif x[0] != assignments_leads[n]:
-                this_assignemnt[('token_nonanchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
+            #elif x[0] != assignments_leads[n]:
+                #this_assignemnt[('token_nonanchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
         for x in differences:
             if x[0] == assignments_leads[n]:
                 this_assignemnt[('diff_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)

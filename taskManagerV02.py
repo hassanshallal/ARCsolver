@@ -81,10 +81,10 @@ class TaskManager: # works on a task by task level, there are checks and balance
             #same_problem_statement = all(x == problem_statements[0] for x in problem_statements)
 
             if same_color_to_token:
-                print('Found ONE code: ')
+                #print('Found ONE code: ')
                 return color_to_tokens, token_to_colors, problem_statements
             else:
-                print('Found MULTIPLE codes: ')
+                #print('Found MULTIPLE codes: ')
                 return color_to_tokens, token_to_colors, problem_statements
         else:
             print('coming soon in a different taste!')
