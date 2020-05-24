@@ -87,7 +87,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 #print('Found MULTIPLE codes: ')
                 return color_to_tokens, token_to_colors, problem_statements
         else:
-            print('coming soon in a different taste!')
+            #print('coming soon in a different taste!')
             return {}, {}, []
 
     # This method provide a holistic problem graph of the task

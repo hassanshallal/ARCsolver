@@ -43,9 +43,11 @@ def load_set(path):
 
 # critical for processing further
 def fix_dim(arr):
+    if type(arr) == int:
+        arr = [[arr]]
     if type(arr) == list:
         arr = np.array(arr)
-    elif type(arr) != np.ndarray:
+    if type(arr) != np.ndarray:
         raise BaseException('Input must be a list or a numpy array.')
 
     guaranteed_dim = arr.shape[0]
@@ -132,10 +134,6 @@ def plot_task(task, plot_test=False):
     plt.show()
 
 def plot_task_eval(task, testpreds):
-    """
-    Plots the first train and test pairs of a specified task,
-    using same color scheme as the ARC app
-    """
     cmap = colors.ListedColormap(
         ['#000000', '#0074D9', '#FF4136', '#2ECC40', '#FFDC00',
          '#AAAAAA', '#F012BE', '#FF851B', '#7FDBFF', '#870C25'])
@@ -174,7 +172,7 @@ def plot_task_eval(task, testpreds):
         elif type(testpreds) == dict:
             iter = 0
             for k, v in testpreds.items():
-                axs[train_len*2 + 2 + iter].imshow(testpreds[k][1][0], cmap=cmap, norm=norm)
+                axs[train_len*2 + 2 + iter].imshow(fix_dim(int(testpreds[k][1])), cmap=cmap, norm=norm)
                 axs[train_len*2 + 2 + iter].axis('off')
                 axs[train_len*2 + 2 + iter].set_title(k)
                 iter += 1
