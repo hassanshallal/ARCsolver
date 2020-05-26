@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 from itertools import permutations, combinations
 import numpy as np
-
+from functools import reduce
 
 from deductiveV02 import *
 
@@ -147,7 +147,7 @@ def plot_task_eval(task, testpreds):
     elif type(testpreds) == dict:
         fig_dim = train_len*2 + (test_len*2 + len(testpreds))
 
-    #print(fig_dim)
+
     fig, axs = plt.subplots(1, fig_dim, figsize=(fig_dim + 10,  fig_dim + 10))
 
     for n in range(train_len):
@@ -303,8 +303,18 @@ def get_non_bg_set_situation(in_val_list, out_val_list, bg):
     out_val_nonbg_set = set(out_val_list)
     return in_val_nonbg_set.issubset(out_val_nonbg_set)
 
+def get_common_nonbg_inputs(traininputs_vals):
+    # s = None
+    # for e in traininputs_vals:
+    # if not s:
+    #     s = set(e)
+    # else:
+    #     s &= set(e)
+    return reduce((lambda x,y: x & y), map(set, traininputs_vals)) #s
 
-def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg):
+
+def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg, priority_nonbg):
+    priority_nonbg_list = sorted(list(set([x for x in priority_nonbg if x != bg])))
     in_val_list = [x for x in in_val_list if x != bg]
     out_val_list = [x for x in out_val_list if x != bg]
     in_val_nonbg_set = sorted(list(set(in_val_list)))
@@ -316,20 +326,20 @@ def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg):
     col_to_token = {}
     col_to_token[bg] = 'bg'
 
-    #print(col_to_token)
+    for n in range(len(priority_nonbg_list)):
+        if priority_nonbg_list[n] not in col_to_token.keys() and (priority_nonbg_list[n] in nonbg_target_val_set or priority_nonbg_list[n] in couple_val_map.keys()): #we are focusing on what changes
+            cur_len = len(col_to_token)
+            col_to_token[priority_nonbg_list[n]] = 'nonbg' + str(cur_len-1) + 'pr'
+
     for n in range(len(in_val_nonbg_set)):
-        #print('A')
         if in_val_nonbg_set[n] not in col_to_token.keys() and (in_val_nonbg_set[n] in nonbg_target_val_set or in_val_nonbg_set[n] in couple_val_map.keys()): #we are focusing on what changes
             cur_len = len(col_to_token)
             col_to_token[in_val_nonbg_set[n]] = 'nonbg' + str(cur_len-1)
-            #print(col_to_token)
 
     for n in range(len(out_val_nonbg_set)):
-        #print('B')
         if out_val_nonbg_set[n] not in col_to_token.keys() and (out_val_nonbg_set[n] in nonbg_target_val_set or out_val_nonbg_set[n] in couple_val_map.keys()):
             cur_len = len(col_to_token)
             col_to_token[out_val_nonbg_set[n]] = 'nonbg' + str(cur_len-1)
-            #print(col_to_token)
 
     return col_to_token
 
@@ -339,17 +349,10 @@ def get_token_to_color_class_C(col_to_token):
 
 
 def get_problem_statement_class_C(col_to_token, couple_value_map):
-#     print('col_to_token is:' , col_to_token)
-#     print('couple_value_map is: ', couple_value_map)
     problem_statement = []
     for k, v in couple_value_map.items():
         value_list = sorted(list(v))
-#         print('k is: ', str(k))
-#         print(value_list)
         for n in value_list:
-#             print(n)
-#             print(col_to_token[k])
-#             print(col_to_token[n])
             problem_statement.append((col_to_token[k], col_to_token[n]))
 
     return sorted(problem_statement)
@@ -382,19 +385,6 @@ def is_same_nonbgs_per_couple(traininputs_vals, trainoutputs_vals, bg):
     len_check = all([x == y for x, y in zip(traininputs_vals_here, trainoutputs_vals_here)])
 
     return len_check
-
-def is_same_nonbgs_per_couple(traininputs_vals, trainoutputs_vals, bg):
-    traininputs_vals_here = deepcopy(traininputs_vals)
-    trainoutputs_vals_here = deepcopy(trainoutputs_vals)
-    for n in range(len(traininputs_vals_here)):
-        traininputs_vals_here[n] = [x for x in traininputs_vals_here[n] if x != bg]
-    for n in range(len(trainoutputs_vals_here)):
-        trainoutputs_vals_here[n] = [x for x in trainoutputs_vals_here[n] if x != bg]
-
-    len_check = all([x == y for x, y in zip(traininputs_vals_here, trainoutputs_vals_here)])
-
-    return len_check
-
 
 def get_coordinates_of_tuple(x, in_, out_):
     if type(in_) == list:

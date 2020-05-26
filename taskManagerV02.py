@@ -63,17 +63,23 @@ class TaskManager: # works on a task by task level, there are checks and balance
             self.deductive_coder1 = None
 
     # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
+        self.priority_nonbg_input = sorted(list(get_common_nonbg_inputs(self.traininputs_vals)))
+        self.priority_nonbg_output = sorted(list(get_common_nonbg_inputs(self.trainoutputs_vals)))
         self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
         self.problem_graph = self.express_problem_graph()
         self.assignments_leads, self.asssignments_output = self.generate_set_assignemtns()
+        self.objective, self.objective_status = self.get_objectives()
 
+    # self.color_to_tokens, self.token_to_colors, self.problem_statements, self.problem_graph, self.asssignments_output
+    # we have the above for each training couple
+    # extract better objectives
 
 
     # Methods
     # This method tokenize a task
     def tokenize(self):
         if self.is_similar_dim and self.global_bg: #self.tokenizer_class == 'C':
-            color_to_tokens = [get_col_to_token_class_C(x, y, z, self.bg) for x, y, z in zip(self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
+            color_to_tokens = [get_col_to_token_class_C(x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for x, y, z in zip(self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
             token_to_colors = [get_token_to_color_class_C(x) for x in color_to_tokens]
             problem_statements = [get_problem_statement_class_C(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
 
@@ -118,37 +124,79 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 asssignments_output.append(results[n][1])
             return assignments_leads, asssignments_output
         else:
-            return ['ARCsolver doesn can not generate sets out fo the problem graph yet.'], ['This requires a different mindset!']
+            return ['ARCsolver doesn can not generate sets out of the problem graph yet.'], ['This requires a different mindset!']
+
+
+    # what are the pairs to be resolved
+    def get_objectives(self):
+        if type(self.problem_graph[0]) != str:
+            copy_problem_graph = []
+            for n in self.problem_graph:
+                copy_problem_graph.append(tuple(sorted([y for y in n if type(y[0]) == str])))
+
+            copy_problem_graph = list(set(copy_problem_graph))
+            if len(copy_problem_graph) == 1:
+                combs = sorted(list(combinations(sorted(copy_problem_graph[0]), 2)))
+                combs = [list(x) for x in combs if x[0][0] == x[1][0]]
+                return combs, 'obd' # one by default
+            elif len(copy_problem_graph) > 1:
+                current_boss = []
+                copy_problem_graph = sorted(copy_problem_graph, key=len, reverse=False)
+                for n in range(len(copy_problem_graph)-1):
+                    if set(copy_problem_graph[n]).issubset(set(copy_problem_graph[n + 1])):
+                        if len(current_boss) > 0 and current_boss[len(current_boss) - 1] != copy_problem_graph[n+1]:
+                            current_boss.append(copy_problem_graph[n+1])
+                        elif len(current_boss) == 0:
+                            current_boss.append(copy_problem_graph[n+1])
+
+                if len(current_boss) == 0:
+                    #combs = [sorted(list(combinations(sorted(x[0]), 2))) for x in current_boss]
+                    return copy_problem_graph, 'irr'# this is another level of difficulty I guess, irreducible
+                elif len(current_boss)  == 1:
+                    combs = sorted(list(combinations(sorted(current_boss[0]), 2)))
+                    combs = [list(x) for x in combs if x[0][0] == x[1][0]]
+                    return combs, 'red' # we had a total reduction here, just account for variability
+                elif len(current_boss)  > 1 and len(current_boss) < len(self.problem_graph):
+                    combs = [sorted(list(combinations(sorted(x[0]), 2))) for x in current_boss]
+                    for n in range(len(combs)):
+                        combs[n] = [list(x) for x in combs[n] if x[0][0] == x[1][0]]
+                    return combs, 'pred' # a case must have been a subset of another case for sure, partially reduced
+
+        else:
+            return ['ARCsolver doesn can not generate an objective yet.'], 'None'
+
+
 
     # simple print utilities
     def brief_task(self):
-        print('is_similar_dim: ', self.is_similar_dim,)
-        print('input_dims info: ', self.input_dims)
-        print('output_dims info: ', self.output_dims)
-        print('traininputs_vals: ', self.traininputs_vals)
-        print('trainoutputs_vals: ', self.trainoutputs_vals)
-        print('couple_val_map: ', self.couple_val_map)
-        print('global_bg: ', self.global_bg)
-        print('bg: ', self.bg)
-        print('deductive_coder0: ', self.deductive_coder0)
-        print('deductive_coder1: ', self.deductive_coder1)
-        print('global_value_map: ', self.global_value_map)
-        print('global_similars: ', self.global_similars)
-        print("=========")
-        print('information about tokenization:')
-        #print('tokenization class: ', self.tokenizer_class)
-        print('color_to_tokens: ', self.color_to_tokens)
-        print('token_to_colors: ', self.token_to_colors)
-        print('problem_statements: ', self.problem_statements)
-        print('length problem_graph: ', len(self.problem_graph))
-        print('problem_graph: ', self.problem_graph)
-
-        if type(self.asssignments_output[0]) == list:
-            for m in range(len(self.asssignments_output)):
-                for n in self.asssignments_output[m]:
-                    for k, v in n.items():
-                        print(k, ' : ', str([len(l) for l in v]))
-                    print("end of assignment.")
-                print("end of an option :).")
-        print(self.traininputs)
+        # print('is_similar_dim: ', self.is_similar_dim,)
+        # print('input_dims info: ', self.input_dims)
+        # print('output_dims info: ', self.output_dims)
+        # print('traininputs_vals: ', self.traininputs_vals)
+        # print('trainoutputs_vals: ', self.trainoutputs_vals)
+        # print('couple_val_map: ', self.couple_val_map)
+        # print('global_bg: ', self.global_bg)
+        # print('bg: ', self.bg)
+        # print('deductive_coder0: ', self.deductive_coder0)
+        # print('deductive_coder1: ', self.deductive_coder1)
+        # print('global_value_map: ', self.global_value_map)
+        # print('global_similars: ', self.global_similars)
+        # print("=========")
+        # print('information about tokenization:')
+        # print('color_to_tokens: ', self.color_to_tokens)
+        # print('token_to_colors: ', self.token_to_colors)
+        # print('problem_statements: ', self.problem_statements)
+        # print('length problem_graph: ', len(self.problem_graph))
+        # print('problem_graph: ', self.problem_graph)
+        #
+        # if type(self.asssignments_output[0]) == list:
+        #     for m in range(len(self.asssignments_output)):
+        #         for n in self.asssignments_output[m]:
+        #             for k, v in n.items():
+        #                 print(k, ' : ', str([len(l) for l in v]))
+        #             print("end of assignment.")
+        #         print("end of an option :).")
+        # print(self.traininputs)
+        print(self.objective)
+        print(self.objective_status)
         print("=========")

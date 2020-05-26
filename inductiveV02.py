@@ -55,6 +55,19 @@ def captured_astar_util(arr, n, m, bg, all_):
     else:
         return True
 
+#
+def get_edge_set(maze):
+    dim_0 = maze.shape[0]
+    dim_1 = maze.shape[1]
+    edge_list = []
+    for n in range(dim_0):
+        for m in range(dim_1):
+            if n == 0 or n == dim_0-1 or m == 0 or m == dim_1-1:
+                edge_list.append([maze[n][m], (n, m)])
+
+    return edge_list
+
+
 def manufacture_dict_captured_whole():
     captured = {}
     captured[1] = []
@@ -103,7 +116,7 @@ def captured_situation_whole_interior(maze, arr, n, m, bg, order_, captured):
 def captured_situation_whole(maze, bg = None):
     if bg == None:
         bg = get_background(maze)
-
+    edge_list = get_edge_set(maze)
     captured_ver_hor = manufacture_dict_captured_whole()
     captured_diag = manufacture_dict_captured_whole()
     captured_all = manufacture_dict_captured_whole()
@@ -112,10 +125,14 @@ def captured_situation_whole(maze, bg = None):
         for m in range(1, maze.shape[1]-1):
             arr = maze.copy()
             captured_ver_hor = captured_situation_whole_interior(maze, arr, n, m, bg, 'ver_hor', captured_ver_hor)
+            captured_ver_hor[0] = captured_ver_hor[0] + edge_list
             arr = maze.copy()
             captured_diag = captured_situation_whole_interior(maze, arr, n, m, bg, 'diag', captured_diag)
+            captured_diag[0] = captured_diag[0] + edge_list
             arr = maze.copy()
             captured_all = captured_situation_whole_interior(maze, arr, n, m, bg, 'all', captured_all)
+            captured_all[0] = captured_all[0] + edge_list
+
     return captured_ver_hor, captured_diag, captured_all
 
 
@@ -178,6 +195,7 @@ def assess_captured_target_training_interior(n, x, asssignments_output, traininp
         return None
 
 def assess_captured_target_training(asssignments_output, bg, traininputs, token_to_colors, testinputs, testoutputs):
+    #print('input asssignments_output: ', asssignments_output)
     results = {}
     for n in range(len(traininputs)):
         for x in range(len(asssignments_output[n])):
@@ -194,8 +212,9 @@ def assess_captured_target_training(asssignments_output, bg, traininputs, token_
                 results[k] = v[0]
             else:
                 results[k] = None # something none consistent among training couples
-
+    # print('results: ', results)
     determined = determine_captured_assignments(results)
+    # print('determined: ', determined)
     assessed, preds = assess_captured_target_testing(determined, bg, token_to_colors, testinputs, testoutputs)
     return assessed, preds
 
@@ -213,6 +232,8 @@ def determine_captured_assignments(outputs):
         outcomes = [x[1] for x in v]
         if len(agents) >= 2:
             combs = sorted(list(combinations(sorted(agents), 2)))
+            # print('agents: ', agents)
+            # print('combs: ', combs)
             for n in range(len(combs)): # this will be the possible pairs of players of an assignment
                 first_pair = outcomes[agents.index(combs[n][0])]
                 second_pair = outcomes[agents.index(combs[n][1])]
