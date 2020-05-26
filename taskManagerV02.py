@@ -136,9 +136,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
             copy_problem_graph = list(set(copy_problem_graph))
             if len(copy_problem_graph) == 1:
-                combs = sorted(list(combinations(sorted(copy_problem_graph[0]), 2)))
-                combs = [list(x) for x in combs if x[0][0] == x[1][0]]
-                return combs, 'obd' # one by default
+                return get_this_objective(copy_problem_graph), 'obd' # one by default
             elif len(copy_problem_graph) > 1:
                 current_boss = []
                 copy_problem_graph = sorted(copy_problem_graph, key=len, reverse=False)
@@ -150,22 +148,17 @@ class TaskManager: # works on a task by task level, there are checks and balance
                             current_boss.append(copy_problem_graph[n+1])
 
                 if len(current_boss) == 0:
-                    #combs = [sorted(list(combinations(sorted(x[0]), 2))) for x in current_boss]
                     return copy_problem_graph, 'irr'# this is another level of difficulty I guess, irreducible
                 elif len(current_boss)  == 1:
-                    combs = sorted(list(combinations(sorted(current_boss[0]), 2)))
-                    combs = [list(x) for x in combs if x[0][0] == x[1][0]]
-                    return combs, 'red' # we had a total reduction here, just account for variability
+                    return get_this_objective(current_boss), 'red' # we had a total reduction here, just account for variability
                 elif len(current_boss)  > 1 and len(current_boss) < len(self.problem_graph):
-                    combs = [sorted(list(combinations(sorted(x[0]), 2))) for x in current_boss]
-                    for n in range(len(combs)):
-                        combs[n] = [list(x) for x in combs[n] if x[0][0] == x[1][0]]
-                    return combs, 'pred' # a case must have been a subset of another case for sure, partially reduced
+                    return [get_this_objective(x) for x in current_boss], 'pred' # a case must have been a subset of another case for sure, partially reduced
 
         else:
-            return ['ARCsolver doesn can not generate an objective yet.'], 'None'
+            return ['ARCsolver can not generate an objective for this task yet.'], 'None'
 
-
+    def inductive_strategy(self):
+        
 
     # simple print utilities
     def brief_task(self):

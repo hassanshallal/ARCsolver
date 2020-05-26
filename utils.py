@@ -106,6 +106,7 @@ def plot_task(task, plot_test=False):
     cmap = colors.ListedColormap(
         ['#000000', '#0074D9', '#FF4136', '#2ECC40', '#FFDC00',
          '#AAAAAA', '#F012BE', '#FF851B', '#7FDBFF', '#870C25'])
+
     norm = colors.Normalize(vmin=0, vmax=9)
     train_len = len(task['train'])
     if plot_test:
@@ -113,7 +114,6 @@ def plot_task(task, plot_test=False):
     else:
         fig_dim = train_len*2
     fig, axs = plt.subplots(1, fig_dim, figsize=(fig_dim + 10,  fig_dim + 10))
-
     for n in range(train_len):
         axs[2*n].imshow(task['train'][n]['input'], cmap=cmap, norm=norm)
         axs[2*n].axis('off')
@@ -129,7 +129,6 @@ def plot_task(task, plot_test=False):
                                     ['output'], cmap=cmap, norm=norm)
         axs[train_len*2 + 1].axis('off')
         axs[train_len*2 + 1].set_title('Test Output')
-
     plt.tight_layout()
     plt.show()
 
@@ -146,7 +145,6 @@ def plot_task_eval(task, testpreds):
         fig_dim = train_len*2 + test_len*3
     elif type(testpreds) == dict:
         fig_dim = train_len*2 + (test_len*2 + len(testpreds))
-
 
     fig, axs = plt.subplots(1, fig_dim, figsize=(fig_dim + 10,  fig_dim + 10))
 
@@ -436,3 +434,13 @@ def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_
         asssignments_output.append(this_assignemnt)
 
     return assignments_leads, asssignments_output
+
+def get_this_objective(cur_graph):
+    combs = sorted(list(combinations(sorted(cur_graph[0]), 2)))
+    combs = [list(x) for x in combs if x[0][0] == x[1][0]]
+    leveraged = set()
+    for n in combs:
+        leveraged.add(n[0])
+        leveraged.add(n[1])
+    combs = [[x] for x in cur_graph[0] if x not in leveraged and x[0] != x[1]] + combs
+    return combs

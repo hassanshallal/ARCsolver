@@ -194,10 +194,10 @@ def assess_captured_target_training_interior(n, x, asssignments_output, traininp
     else:
         return None
 
-def assess_captured_target_training(asssignments_output, bg, traininputs, token_to_colors, testinputs, testoutputs):
+def assess_captured_target_training(asssignments_output, traininputs, bg, token_to_colors, testinputs, testoutputs):
     #print('input asssignments_output: ', asssignments_output)
     results = {}
-    for n in range(len(traininputs)):
+    for n in range(len(asssignments_output)):
         for x in range(len(asssignments_output[n])):
             this_assignment_situation = assess_captured_target_training_interior(n, x, asssignments_output, traininputs, bg)
             if this_assignment_situation != None:
@@ -212,7 +212,7 @@ def assess_captured_target_training(asssignments_output, bg, traininputs, token_
                 results[k] = v[0]
             else:
                 results[k] = None # something none consistent among training couples
-    # print('results: ', results)
+    print('results: ', results)
     determined = determine_captured_assignments(results)
     # print('determined: ', determined)
     assessed, preds = assess_captured_target_testing(determined, bg, token_to_colors, testinputs, testoutputs)
