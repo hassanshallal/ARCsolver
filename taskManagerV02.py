@@ -64,7 +64,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
         else:
             self.deductive_coder1 = None
 
-    # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
+        # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
         self.priority_nonbg_input = sorted(list(get_common_nonbg_inputs(self.traininputs_vals)))
         self.priority_nonbg_output = sorted(list(get_common_nonbg_inputs(self.trainoutputs_vals)))
         self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
@@ -72,11 +72,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.assignments_leads, self.asssignments_output = self.generate_set_assignemtns()
         self.objective, self.objective_status = self.get_objectives()
 
-
-    # Induction
-        self.solved, self.mechanisms, self.testpreds = self.inductive_strategy()
-
-
+        # induction
+        self.inductiveV02 = Inductive(self.traininputs, self.trainoutputs, self.testinputs, self.objective_status, self.objective, self.asssignments_output, self.bg, self.token_to_colors, self.testoutputs)
+        self.inductiveV02.inductive_strategy()
 
     # Methods
     # This method tokenize a task
@@ -159,24 +157,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         else:
             return ['ARCsolver can not generate an objective for this task yet.'], 'None'
-
-    def inductive_strategy(self): # method for an instance of induction:
-        # output: solved/unsokved, mechanisms, testpreds,
-        # flips:
-        x, y, z = screen_flips(self.traininputs, self.trainoutputs, self.testinputs, self.testoutputs)
-        if x != 'unsolved':
-            return x, y, z
-
-        # screen captured:
-        x, y, z = screen_captured(self.traininputs, self.trainoutputs, self.testinputs, self.objective_status, self.objective, self.asssignments_output, self.bg, self.token_to_colors, self.testoutputs)
-        if x == 'partially solved':
-            self.objective = y # we have a partially resolved objective
-            return x, [], z
-        if x == 'solved':
-            return x, y, z
-
-
-        return 'unsolved', [], []
 
 
 

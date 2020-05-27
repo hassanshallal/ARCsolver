@@ -1,4 +1,6 @@
 
+from utils import *
+
 # captured_astar(grid, x, y, bg, all_) # recursive done
 # captured_astar_util(arr, n, m, bg, all_), done
 # we will apply A-star in order to determine whether a cell is trapped with no access to edges or not
@@ -148,7 +150,7 @@ def assess_captured_holistic_training(traininputs, testinputs):
     train_task_output_diag = []
     train_task_output_all = []
 
-    for n in range(len(trainoutputs)):
+    for n in range(len(traininputs)):
         ver_hor_, diag_, all_ = captured_situation_whole(traininputs[n])
         train_task_output_ver_hor.append(ver_hor_)
         train_task_output_diag.append(diag_)
@@ -198,33 +200,33 @@ def check_objective_against_captured(asssignments_output, objective, bg, trainin
         elif len(this_check) == 2:
             first_target_coords = retrieve_coords_from_assignments(this_check[0], asssignments_output)
             second_target_coords = retrieve_coords_from_assignments(this_check[1], asssignments_output)
-            assert(len(first_target_coords) == len(second_target_coords))
-            for m in range(len(first_target_coords)):
-                first_target_result = captured_situation_target(traininputs[m], first_target_coords[m], bg)
-                second_target_result = captured_situation_target(traininputs[m], second_target_coords[m], bg)
-                comparison = [x != y  for x, y in zip(first_target_result, second_target_result)]
-                if comparison[2]:
-                    if first_target_result[2] and not second_target_result[2]:
-                        cap = (this_check[0])
-                        uncap = (this_check[1])
-                    elif not first_target_result[2] and second_target_result[2]:
-                        cap = (this_check[1])
-                        uncap = (this_check[0])
-                    objective[n] = (this_check[0], this_check[1], 'cap_all', uncap, cap)
-                    continue
-                elif comparison[0] or comparison[1]:
-                    if comparison[0]:
-                        target, method = 0, 'cap_ver_hor'
-                    else:
-                        target, method = 1, 'cap_diag'
-                    if first_target_result[target] and not second_target_result[target]:
-                        cap = (this_check[0])
-                        uncap = (this_check[1])
-                    elif not first_target_result[target] and second_target_result[target]:
-                        cap = (this_check[1])
-                        uncap = (this_check[0])
-                    objective[n] = (this_check[0], this_check[1], method, uncap, cap)
-                    continue
+            if len(first_target_coords) == len(second_target_coords):
+                for m in range(len(first_target_coords)):
+                    first_target_result = captured_situation_target(traininputs[m], first_target_coords[m], bg)
+                    second_target_result = captured_situation_target(traininputs[m], second_target_coords[m], bg)
+                    comparison = [x != y  for x, y in zip(first_target_result, second_target_result)]
+                    if comparison[2]:
+                        if first_target_result[2] and not second_target_result[2]:
+                            cap = (this_check[0])
+                            uncap = (this_check[1])
+                        elif not first_target_result[2] and second_target_result[2]:
+                            cap = (this_check[1])
+                            uncap = (this_check[0])
+                        objective[n] = (this_check[0], this_check[1], 'cap_all', uncap, cap)
+                        continue
+                    elif comparison[0] or comparison[1]:
+                        if comparison[0]:
+                            target, method = 0, 'cap_ver_hor'
+                        else:
+                            target, method = 1, 'cap_diag'
+                        if first_target_result[target] and not second_target_result[target]:
+                            cap = (this_check[0])
+                            uncap = (this_check[1])
+                        elif not first_target_result[target] and second_target_result[target]:
+                            cap = (this_check[1])
+                            uncap = (this_check[0])
+                        objective[n] = (this_check[0], this_check[1], method, uncap, cap)
+                        continue
 
     return objective
 

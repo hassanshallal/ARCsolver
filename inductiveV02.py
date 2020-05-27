@@ -3,131 +3,233 @@
 from utils import *
 from capturedV02 import *
 
-# The following examine simple matrix rotations and mirroring
-def get_diagonal_mirror(arr):
-    arr = fix_dim(arr)
-    return np.fliplr(np.transpose(arr[::-1]))
+class Inductive:
+    def __init__(self, traininputs, trainoutputs, testinputs, objective_status, objective, asssignments_output, bg, token_to_colors, testoutputs = None):
+        self.traininputs = traininputs
+        self.trainoutputs = trainoutputs
+        self.testinputs = testinputs
+        self.objective_status = objective_status
+        self.objective = objective
+        self.asssignments_output = asssignments_output
+        self.bg = bg
+        self.token_to_colors = token_to_colors
+        self.testoutputs = testoutputs
 
-def get_offdiagonal_mirror(arr):
-    arr = fix_dim(arr)
-    return np.flipud(np.transpose(arr[::-1]))
+        # These are important and can be retrieved anytime
+        self.running_objective = deepcopy(self.objective)
+        self.cur_train_preds = deepcopy(self.traininputs)
+        self.cur_test_preds = deepcopy(self.testinputs)
 
-# There may be some redundancie in the screen_flips_rotation function, no time to gather test cases
-def screen_flips_rotation(in_, out_):
-    in_ = fix_dim(in_)
-    out_ = fix_dim(out_)
+        # Induction
+        self.solved, self.mechanisms, self.testpreds = self.inductive_strategy()
 
-    # rotation is more precedent over flipud or fliplr
-    if np.all(np.rot90(in_, 1, axes = (0, 1)) == out_):
-        return np.rot90, 1
-    elif np.all(np.rot90(in_, 2, axes = (0, 1)) == out_):
-        return np.rot90, 2
-    elif np.all(np.rot90(in_, 3, axes = (0, 1)) == out_):
-        return np.rot90, 3
-    elif np.all(get_diagonal_mirror(in_) == out_):
-        return get_diagonal_mirror, None
-    elif np.all(get_offdiagonal_mirror(in_) == out_):
-        return get_offdiagonal_mirror, None
-    elif np.all(np.flipud(in_) == out_):
-        return np.flipud, None
-    elif np.all(np.fliplr(in_) == np.array(out_)):
-        return np.fliplr, None
-    else:
-        return False, None
+    def inductive_strategy(self): # method for an instance of induction:
+        # output: x = solved/unsolved, y = mechanisms (functions to apply), testpreds (preds to plot)
+        # flips:
+        x, y, z = self.screen_flips()
+        if x != 'unsolved':
+            return x, y, z
 
-def screen_flips(traininputs, trainoutputs, testinputs, testoutputs):
-    are_flips = [screen_flips_rotation(in_, out_) for in_, out_ in zip(traininputs, trainoutputs)] # this took care of train validation
-    if all([x[0] != False for x in are_flips]) and all([x[0] == are_flips[0][0] for x in are_flips]):
-        if are_flips[0][1] != None:
-            testpreds = [are_flips[0][0](x, are_flips[0][1]) for x in testinputs]
-        else:
-            testpreds = [are_flips[0][0](x) for x in testinputs]
-        test_evaluated = all([np.array_equal(x, y) for x, y in zip(testpreds, testoutputs)])
-        if test_evaluated:
-            return 'solved', [(are_flips[0][0], are_flips[0][1])], testpreds
-        elif not test_evaluated:
-            return 'overfit but not solved', [(are_flips[0][0], are_flips[0][1])], testpreds
+        # screen captured:
+        x, y, z = self.screen_captured()
+        if x != 'unsolved':
+            return x, y, z
+
+        return 'unsolved', [], []
+
+    def screen_flips(self):
+        # check on training
+        are_flips = [screen_flips_rotation(in_, out_) for in_, out_ in zip(self.traininputs, self.trainoutputs)] # this took care of train validation
+        if all([x[0] != False for x in are_flips]) and all([x[0] == are_flips[0][0] for x in are_flips]):
+            if are_flips[0][1] != None:
+                self.cur_test_preds = [are_flips[0][0](x, are_flips[0][1]) for x in self.cur_test_preds]
+            else:
+                self.cur_test_preds = [are_flips[0][0](x) for x in self.cur_test_preds]
+
+            if self.testoutputs:
+                test_evaluated = all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testoutputs)])
+            else:
+                test_evaluated = False
+
+            if test_evaluated:
+                return 'solved', [(are_flips[0][0], are_flips[0][1])], self.cur_test_preds
+            elif not test_evaluated:
+                return 'partially solved', [(are_flips[0][0], are_flips[0][1])], self.cur_test_preds
         else:
             return 'unsolved', [], []
-    return 'unsolved', [], []
 
 
-# assess_captured_holistic_testing(this_task_output, trainoutputs, testinputs, order_, testoutputs = None)
-# we're here and we're trying to turn inductive into a class on its own and maintain a modified objevtive and
-# a current prediction and solved/partially solved/unsolved status, work this out so that inductive
-# can be further extended and elaborated.
-def screen_captured(traininputs, trainoutputs, testinputs, objective_status, objective, asssignments_output, bg, token_to_colors, testoutputs = None):
-    # Now, we need to establish the way of screening here
-    # what
-    if objective_status == None:
-        a, b = assess_captured_holistic_training(traininputs, testinputs)
-        # from a, b to x, y, z
-        return 'unsolved', [], [] #x, y, z
-    elif objective_status == 'obd' or  objective_status == 'red':
-        a, b =  assess_captured_target_training(asssignments_output, objective, bg, traininputs, testinputs)
-        # from a, b to x, y, z: # we need to create outputs out of the modified objective and the b (testinputs as sets)
-        if len(b) > 0:
-            objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in b]
-            if all(objective_satisfiability):
-                # you must ouput a mechanism, a solution
+    # this method confirms we have signals to proceed, if all points are captured or uncaptured then there is no signal
+    # [train_task_output_ver_hor, train_task_output_diag, train_task_output_all],
+    # [test_task_output_ver_hor, test_task_output_diag, test_task_output_all]
+    def is_list_one_value(list_ex):
+        return all([x == list_ex[0] for x in list_ex])
 
-                return 'solved', [], []
-            elif any(objective_satisfiability):
-                # you must output a modified objective and a partial solution
+    def is_list_equal_1(self, list_ex):
+        return all([x == 1 for x in list_ex])
 
-                return 'partially solved', b, []
+    def first_principles_diff_dim_checks(self, *args):
+        for n in args:
+            ext_len = len(n)
+            int_len = len(n[0])
+            for x in range(ext_len):
+                for y in range(int_len):
+                    if len(n[x][y][0]) == 0 or len(n[x][y][1]) == 0:
+                        return False
+        return True
+
+    def first_principles_diff_dim_signal_size(self, *args):
+        zero_signal = []
+        one_signal = []
+
+        for n in args:
+            ext_len = len(n)
+            int_len = len(n[0])
+            for x in range(ext_len):
+                for y in range(int_len):
+                    zero_signal.append(len(n[x][y][0]))
+                    one_signal.append(len(n[x][y][1]))
+
+        return zero_signal, one_signal
+
+    def get_set_of_values_1(self, this_dict):
+        values = set()
+        target = this_dict[1]
+        for n in range(len(target)):
+            values.add(target[n][0])
+        return values
+
+
+    def first_principles_diff_dim_signal_class(self, results):
+        overall_cur_invest_num_unique = []
+        overall_cur_invest_unique = []
+        for n in range(len(results)): # 3 for captured
+            cur_invest = results[n]
+            cur_invest_num_unique = []
+            cur_invest_unique = []
+            for x in range(len(cur_invest)): # num_train
+                this_result = cur_invest[x]
+                values_1 = self.get_set_of_values_1(this_result)
+                cur_invest_num_unique.append(len(values_1))
+                if len(values_1) == 1:
+                    cur_invest_unique.append(values_1.pop())
+                else:
+                    cur_invest_unique.append(values_1)
+            overall_cur_invest_num_unique.append(cur_invest_num_unique)
+            overall_cur_invest_unique.append(cur_invest_unique)
+
+        return overall_cur_invest_num_unique, overall_cur_invest_unique
+
+    def validate_cap(self, overall_cur_invest_num_unique, overall_cur_invest_unique, order_, unique_train_outputs, b):
+        if self.is_list_equal_1(overall_cur_invest_num_unique[order_]):
+            if overall_cur_invest_unique[order_] == unique_train_outputs:
+                test_num_unique, test_unique = self.first_principles_diff_dim_signal_class(b)
+                if self.is_list_equal_1(test_num_unique[order_]):
+                    return True, test_unique
+            else:
+                return False, []
+        else:
+            return False, []
+
+
+    def screen_captured(self):
+        if self.objective_status == 'None':
+            unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
+            is_unique_train_outputs = [len(x) == 1 for x in unique_train_outputs]
+            a, b = assess_captured_holistic_training(self.traininputs, self.testinputs)
+            if not self.first_principles_diff_dim_checks(a) or not all(is_unique_train_outputs):
+                return 'unsolved', [], []
+            else:
+                if all(is_unique_train_outputs):
+                    unique_train_outputs = [x[0] for x in unique_train_outputs]
+                    overall_cur_invest_num_unique, overall_cur_invest_unique = self.first_principles_diff_dim_signal_class(a)
+                    m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, 2, unique_train_outputs, b)
+                    if m:
+                        return 'solved', ['cap_all', 'one_unique_captured'], [[[l] for l in n[2]]]
+                    m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, 0, unique_train_outputs, b)
+                    if m:
+                        return 'solved', ['cap_ver_hor', 'one_unique_captured'], [[[l] for l in n[0]]]
+                    m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, 1, unique_train_outputs, b)
+                    if m:
+                        return 'solved', ['cap_diag', 'one_unique_captured'], [[l] for l in n[1]]
+                return 'unsolved', [], []
+
+        elif self.objective_status == 'obd' or  self.objective_status == 'red':
+            a, b =  assess_captured_target_training(self.asssignments_output, self.running_objective, self.bg, self.traininputs, self.testinputs)
+            # we need to create outputs out of the modified objective and the b (testinputs as sets)
+            if len(b) > 0:
+                self.running_objective = a
+                objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
+                if all(objective_satisfiability):
+                    if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
+                        mechanisms = self.get_mechanism_preds(b)
+                        if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testoutputs)]):
+                            return 'solved', mechanisms, self.cur_test_preds
+                        else:
+                            return 'partially solved', mechanisms, self.cur_test_preds
+                    else:
+                        return 'unsolved', [], []
+
+                elif any(objective_satisfiability):
+                    if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
+                        mechanisms = self.get_mechanism_preds(b)
+                        return 'partially solved', mechanisms, self.cur_test_preds
+                    else:
+                        return 'unsolved', [], []
+                else:
+                    return 'unsolved', [], []
             else:
                 return 'unsolved', [], []
-    elif objective_status == 'pred' or objective_status == 'irr':
-        return 'unsolved', [], []
-    else:
-        return 'unsolved', [], []
+        elif self.objective_status == 'pred' or self.objective_status == 'irr':
+            return 'unsolved', [], []
+
+    def objectively_build_a_prediction(self, change_tuple, coordinates):
+        assert(len(coordinates) == len(self.cur_test_preds))
+        for n in range(len(coordinates)):
+            these_coords = coordinates[n]
+            for m in these_coords:
+                coord = m[1]
+                cur = self.cur_test_preds[n][coord[0]][coord[1]]
+                if cur == self.token_to_colors[0][change_tuple[0]]:
+                    self.cur_test_preds[n][coord[0]][coord[1]] = self.token_to_colors[0][change_tuple[1]]
+
+    def apply_direct_transformation(self, change_tuple):
+        for x in range(len(self.cur_test_preds)):
+            for n in range(self.cur_test_preds[x].shape[0]):
+                for m in range(self.cur_test_preds[x].shape[1]):
+                    cur = self.cur_test_preds[x][n][m]
+                    if cur == self.token_to_colors[0][change_tuple[0]]:
+                        self.cur_test_preds[x][n][m] = self.token_to_colors[0][change_tuple[1]]
+        return
 
 
+    def get_mechanism_preds(self, signal_): # signal_ = b above
+        mechanisms = set()
+        for n in self.running_objective:
+            if len(n) > 2:
+                if n[2] == 'direct':
+                    mechanisms.add(n[2])
+                    self.apply_direct_transformation((n[0], n[1]))
+                    # in cur_test_preds, replace n[0] with n[1]
+                else:
+                    mechanisms.add(n[2])
+                    if n[2] == 'cap_all':
+                        this_signal = signal_[2]
+                    elif n[2] == 'cap_ver_hor':
+                        this_signal = signal_[0]
+                    elif n[2] == 'cap_diag':
+                        this_signal = signal_[1]
 
-# we don't pass self.testoutputs
-# we recieve a, b: captured_situation_whole(traininput), captured_situation_whole(testinput)
-#            a, b: modified_objective, captured_situation_whole(testinput)
-# what do we want from inductive?
-# if objst == None, return captured_situation_whole(traininput), captured_situation_whole(testinput)
-    # here in taskmanager, first principles will have to be formulated drawing conclusions
-    # of how to derive the output from the captured_situation_whole resuls:
-    # first_principle_one = np.unique(captured_vqlues) == 1 and  np.unique(output) == 1 and np.unique(captured_vqlues) == np.unique(output): task 345 for example
-    # the above is abstracted so as to solve other similar problems, make it convolved pr capable of convolving:
-    # how to further convolve the above pricniple: add the option for uncaptured_vqlues, in essence, there is no reason why this concolution won't work?
-    # SO, the job of inductive here is not really much about inference as much as it's about labelling points with values and coordinates as captured, form a line, with 6 neighbours, whatever?
-# if objst == 'obd' or 'red': return modified_objective, captured_situation_whole(testinput):
-    # taskmanager checks whether the modified_objective is satisfiable or solvable
-    # if it is solvables, it applies it on the test input sets so as to arrive to the predicted outputs
-    # Here is quite a different situation but similar in a sense as of maintaining the control over
-    # inference
-    # as a matter of reality, it doesn't matter. I'd rather delegate inference comletely to inductiveV02
-    # inductive offers the flexibility of extention and must offer the logic of solving
+                    if n[3][0] == n[3][1]:
+                        coords = [x[1] for x in this_signal]
+                        self.objectively_build_a_prediction(n[4], coords)
+                    elif n[4][0] == n[4][1]:
+                        coords = [x[0] for x in this_signal]
+                        self.objectively_build_a_prediction(n[3], coords)
+                    else:
+                        uncap_coords = [x[0] for x in this_signal]
+                        self.objectively_build_a_prediction(n[3], uncap_coords)
+                        cap_coords = [x[1] for x in this_signal]
+                        self.objectively_build_a_prediction(n[4], cap_coords)
 
-# a, b must go throguh either a first principle screenings of values, numbers, dimensions, etc, return x, y, z
-#        or tested for satisfiability, applied to testpinputs, evaluated and return x, y z
-
-    # boolean == len(objective) == satisfied rather than visited
-    # for n in objective:
-    # if len(n) == 1: nonbg --> bg, fire on the current preds working progresses, mark satisfied
-    # elif len(n) == 2: find which first pricniple can differentiate between the two sets
-    # return 'can be solved', [], []
-
-    # are_flips = [screen_flips_rotation(in_, out_) for in_, out_ in zip(traininputs, trainoutputs)]
-    # if all([x[0] != False for x in are_flips]) and all([x[0] == are_flips[0][0] for x in are_flips]):
-    #     if are_flips[0][1] != None:
-    #         trainpreds = [are_flips[0][0](x, are_flips[0][1]) for x in traininputs]
-    #         testpreds = [are_flips[0][0](x, are_flips[0][1]) for x in testinputs]
-    #     else:
-    #         trainpreds = [are_flips[0][0](x) for x in traininputs]
-    #         testpreds = [are_flips[0][0](x) for x in testinputs]
-    #
-    #     train_validated = all([np.array_equal(x, y) for x, y in zip(trainpreds, trainoutputs)])
-    #     test_evaluated = all([np.array_equal(x, y) for x, y in zip(testpreds, testoutputs)])
-    #     if train_validated and test_evaluated:
-    #         return 'solved', [(are_flips[0][0], are_flips[0][1])], testpreds
-    #     elif train_validated and not test_evaluated:
-    #         return 'overfit but not solved', [(are_flips[0][0], are_flips[0][1])], testpreds
-    #     elif not train_validated:
-    #         return 'unsolved', [], []
-    # return 'unsolved', [], []
+        return sorted(list(mechanisms))

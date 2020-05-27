@@ -136,6 +136,7 @@ def plot_task_eval(task, testpreds):
     cmap = colors.ListedColormap(
         ['#000000', '#0074D9', '#FF4136', '#2ECC40', '#FFDC00',
          '#AAAAAA', '#F012BE', '#FF851B', '#7FDBFF', '#870C25'])
+
     norm = colors.Normalize(vmin=0, vmax=9)
     train_len = len(task['train'])
     test_len = len(task['test'])
@@ -143,11 +144,11 @@ def plot_task_eval(task, testpreds):
     fig_dim = 0
     if type(testpreds) == list:
         fig_dim = train_len*2 + test_len*3
-    elif type(testpreds) == dict:
-        fig_dim = train_len*2 + (test_len*2 + len(testpreds))
+
 
     fig, axs = plt.subplots(1, fig_dim, figsize=(fig_dim + 10,  fig_dim + 10))
 
+    #print(fig_dim)
     for n in range(train_len):
         axs[2*n].imshow(task['train'][n]['input'], cmap=cmap, norm=norm)
         axs[2*n].axis('off')
@@ -157,25 +158,20 @@ def plot_task_eval(task, testpreds):
         axs[2*n+1].set_title('Train ' + str(n) + ' output')
 
     for n in range(test_len):
-        axs[train_len*2].imshow(task['test'][n]['input'], cmap=cmap, norm=norm)
-        axs[train_len*2].axis('off')
-        axs[train_len*2].set_title('Test Input')
-        axs[train_len*2 + 1].imshow(task['test'][n]['output'], cmap=cmap, norm=norm)
-        axs[train_len*2 + 1].axis('off')
-        axs[train_len*2 + 1].set_title('Test Output')
+        axs[train_len*2 + (3*n)].imshow(task['test'][n]['input'], cmap=cmap, norm=norm)
+        axs[train_len*2 + (3*n)].axis('off')
+        axs[train_len*2 + (3*n)].set_title('Test Input')
+        axs[train_len*2 + 1 + (3*n)].imshow(task['test'][n]['output'], cmap=cmap, norm=norm)
+        axs[train_len*2 + 1 + (3*n)].axis('off')
+        axs[train_len*2 + 1 + (3*n)].set_title('Test Output')
         if type(testpreds) == list:
-            axs[train_len*2 + 2].imshow(testpreds[n], cmap=cmap, norm=norm)
-            axs[train_len*2 + 2].axis('off')
-            axs[train_len*2 + 2].set_title('Our prediction')
-        elif type(testpreds) == dict:
-            iter = 0
-            for k, v in testpreds.items():
-                axs[train_len*2 + 2 + iter].imshow(fix_dim(int(testpreds[k][1])), cmap=cmap, norm=norm)
-                axs[train_len*2 + 2 + iter].axis('off')
-                axs[train_len*2 + 2 + iter].set_title(k)
-                iter += 1
+            axs[train_len*2 + 2 + (3*n)].imshow(testpreds[n], cmap=cmap, norm=norm)
+            axs[train_len*2 + 2 + (3*n)].axis('off')
+            axs[train_len*2 + 2+ (3*n)].set_title('Our prediction')
+
     plt.tight_layout()
     plt.show()
+
 
 ## instantiation of a task manager utilities
 def explore_dim_arrays(list_of_arrays):
@@ -444,3 +440,36 @@ def get_this_objective(cur_graph):
         leveraged.add(n[1])
     combs = [[x] for x in cur_graph if x not in leveraged and x[0] != x[1]] + combs
     return combs
+
+
+# The following examine simple matrix rotations and mirroring
+def get_diagonal_mirror(arr):
+    arr = fix_dim(arr)
+    return np.fliplr(np.transpose(arr[::-1]))
+
+def get_offdiagonal_mirror(arr):
+    arr = fix_dim(arr)
+    return np.flipud(np.transpose(arr[::-1]))
+
+# There may be some redundancie in the screen_flips_rotation function, no time to gather test cases
+def screen_flips_rotation(in_, out_):
+    in_ = fix_dim(in_)
+    out_ = fix_dim(out_)
+
+    # rotation is more precedent over flipud or fliplr
+    if np.all(np.rot90(in_, 1, axes = (0, 1)) == out_):
+        return np.rot90, 1
+    elif np.all(np.rot90(in_, 2, axes = (0, 1)) == out_):
+        return np.rot90, 2
+    elif np.all(np.rot90(in_, 3, axes = (0, 1)) == out_):
+        return np.rot90, 3
+    elif np.all(get_diagonal_mirror(in_) == out_):
+        return get_diagonal_mirror, None
+    elif np.all(get_offdiagonal_mirror(in_) == out_):
+        return get_offdiagonal_mirror, None
+    elif np.all(np.flipud(in_) == out_):
+        return np.flipud, None
+    elif np.all(np.fliplr(in_) == np.array(out_)):
+        return np.fliplr, None
+    else:
+        return False, None
