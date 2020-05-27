@@ -436,11 +436,11 @@ def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_
     return assignments_leads, asssignments_output
 
 def get_this_objective(cur_graph):
-    combs = sorted(list(combinations(sorted(cur_graph[0]), 2)))
+    combs = sorted(list(combinations(sorted(cur_graph), 2)))
     combs = [list(x) for x in combs if x[0][0] == x[1][0]]
     leveraged = set()
     for n in combs:
         leveraged.add(n[0])
         leveraged.add(n[1])
-    combs = [[x] for x in cur_graph[0] if x not in leveraged and x[0] != x[1]] + combs
+    combs = [[x] for x in cur_graph if x not in leveraged and x[0] != x[1]] + combs
     return combs

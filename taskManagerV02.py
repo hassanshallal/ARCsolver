@@ -1,6 +1,7 @@
 # Be subtle and abstract
 # lists are the container we will use to handle different couples, etc
 from utils import *
+from inductiveV02 import *
 
 class TaskManager: # works on a task by task level, there are checks and balances
     # initiation defines several data members and uses class methods so as to output a problem graph
@@ -11,6 +12,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         self.traininputs, self.trainoutputs = get_training(raw_task) # this will return two lists for inputs and outputs
         self.testinputs, self.testoutputs = get_testing(raw_task)
+        self.trainpreds, self.testpreds = deepcopy(self.traininputs), deepcopy(self.testinputs)
 
         # gather general information about the dimensionality from training
         self.is_similar_dim, self.input_dims, self.output_dims = explore_dimensions(self.traininputs, self.trainoutputs)
@@ -70,9 +72,10 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.assignments_leads, self.asssignments_output = self.generate_set_assignemtns()
         self.objective, self.objective_status = self.get_objectives()
 
-    # self.color_to_tokens, self.token_to_colors, self.problem_statements, self.problem_graph, self.asssignments_output
-    # we have the above for each training couple
-    # extract better objectives
+
+    # Induction
+        self.solved, self.mechanisms, self.testpreds = self.inductive_strategy()
+
 
 
     # Methods
@@ -136,7 +139,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
             copy_problem_graph = list(set(copy_problem_graph))
             if len(copy_problem_graph) == 1:
-                return get_this_objective(copy_problem_graph), 'obd' # one by default
+                return get_this_objective(copy_problem_graph[0]), 'obd' # one by default
             elif len(copy_problem_graph) > 1:
                 current_boss = []
                 copy_problem_graph = sorted(copy_problem_graph, key=len, reverse=False)
@@ -150,38 +153,35 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 if len(current_boss) == 0:
                     return copy_problem_graph, 'irr'# this is another level of difficulty I guess, irreducible
                 elif len(current_boss)  == 1:
-                    return get_this_objective(current_boss), 'red' # we had a total reduction here, just account for variability
+                    return get_this_objective(current_boss[0]), 'red' # we had a total reduction here, just account for variability
                 elif len(current_boss)  > 1 and len(current_boss) < len(self.problem_graph):
                     return [get_this_objective(x) for x in current_boss], 'pred' # a case must have been a subset of another case for sure, partially reduced
 
         else:
             return ['ARCsolver can not generate an objective for this task yet.'], 'None'
 
-    def inductive_strategy(self):
-        
+    def inductive_strategy(self): # method for an instance of induction:
+        # output: solved/unsokved, mechanisms, testpreds,
+        # flips:
+        x, y, z = screen_flips(self.traininputs, self.trainoutputs, self.testinputs, self.testoutputs)
+        if x != 'unsolved':
+            return x, y, z
+
+        # screen captured:
+        x, y, z = screen_captured(self.traininputs, self.trainoutputs, self.testinputs, self.objective_status, self.objective, self.asssignments_output, self.bg, self.token_to_colors, self.testoutputs)
+        if x == 'partially solved':
+            self.objective = y # we have a partially resolved objective
+            return x, [], z
+        if x == 'solved':
+            return x, y, z
+
+
+        return 'unsolved', [], []
+
+
 
     # simple print utilities
     def brief_task(self):
-        # print('is_similar_dim: ', self.is_similar_dim,)
-        # print('input_dims info: ', self.input_dims)
-        # print('output_dims info: ', self.output_dims)
-        # print('traininputs_vals: ', self.traininputs_vals)
-        # print('trainoutputs_vals: ', self.trainoutputs_vals)
-        # print('couple_val_map: ', self.couple_val_map)
-        # print('global_bg: ', self.global_bg)
-        # print('bg: ', self.bg)
-        # print('deductive_coder0: ', self.deductive_coder0)
-        # print('deductive_coder1: ', self.deductive_coder1)
-        # print('global_value_map: ', self.global_value_map)
-        # print('global_similars: ', self.global_similars)
-        # print("=========")
-        # print('information about tokenization:')
-        # print('color_to_tokens: ', self.color_to_tokens)
-        # print('token_to_colors: ', self.token_to_colors)
-        # print('problem_statements: ', self.problem_statements)
-        # print('length problem_graph: ', len(self.problem_graph))
-        # print('problem_graph: ', self.problem_graph)
-        #
         # if type(self.asssignments_output[0]) == list:
         #     for m in range(len(self.asssignments_output)):
         #         for n in self.asssignments_output[m]:
@@ -192,4 +192,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
         # print(self.traininputs)
         print(self.objective)
         print(self.objective_status)
+        print(self.solved)
+        print(self.mechanisms)
+        #print(self.testpreds)
         print("=========")
