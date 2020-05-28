@@ -20,8 +20,29 @@ class Inductive:
         self.cur_train_preds = deepcopy(self.traininputs)
         self.cur_test_preds = deepcopy(self.testinputs)
 
+        # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
+        self.test_token_to_color = self.get_test_token_to_color()
+
         # Induction
         self.solved, self.mechanisms, self.testpreds = self.inductive_strategy()
+
+    def get_test_token_to_color(self):
+        if len(self.token_to_colors) > 0:
+            if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
+                return self.token_to_colors[0]
+            else:
+                pr_tokens = {}
+                for n in self.token_to_colors:
+                    for k, v in n.items():
+                        if 'pr' in k:
+                            pr_tokens[v] = k
+                if len(pr_tokens) > 0: # this is the only way to transfer
+                    testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
+                    final_test_nonbg = sorted(list(get_common_nonbg_inputs(testinputs_vals)))
+                    test_color_to_token = get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, self.bg)
+                    return get_token_to_color_class_C(test_color_to_token)
+                else:
+                    return {}
 
     def inductive_strategy(self): # method for an instance of induction:
         # output: x = solved/unsolved, y = mechanisms (functions to apply), testpreds (preds to plot)
@@ -58,10 +79,6 @@ class Inductive:
         else:
             return 'unsolved', [], []
 
-
-    # this method confirms we have signals to proceed, if all points are captured or uncaptured then there is no signal
-    # [train_task_output_ver_hor, train_task_output_diag, train_task_output_all],
-    # [test_task_output_ver_hor, test_task_output_diag, test_task_output_all]
     def is_list_one_value(list_ex):
         return all([x == list_ex[0] for x in list_ex])
 
@@ -99,7 +116,6 @@ class Inductive:
             values.add(target[n][0])
         return values
 
-
     def first_principles_diff_dim_signal_class(self, results):
         overall_cur_invest_num_unique = []
         overall_cur_invest_unique = []
@@ -131,7 +147,6 @@ class Inductive:
         else:
             return False, []
 
-
     def screen_captured(self):
         if self.objective_status == 'None':
             unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
@@ -161,21 +176,19 @@ class Inductive:
                 self.running_objective = a
                 objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
                 if all(objective_satisfiability):
-                    if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
-                        mechanisms = self.get_mechanism_preds(b)
-                        if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testoutputs)]):
-                            return 'solved', mechanisms, self.cur_test_preds
-                        else:
-                            return 'partially solved', mechanisms, self.cur_test_preds
-                    else:
+                    mechanisms = self.get_mechanism_preds(b, True)
+                    if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testoutputs)]):
+                        return 'solved', mechanisms, self.cur_test_preds
+                    elif any([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testinputs)]):
                         return 'unsolved', [], []
-
-                elif any(objective_satisfiability):
-                    if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
-                        mechanisms = self.get_mechanism_preds(b)
+                    else:
                         return 'partially solved', mechanisms, self.cur_test_preds
-                    else:
+                elif any(objective_satisfiability):
+                    mechanisms = self.get_mechanism_preds(b)
+                    if any([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testinputs)]):
                         return 'unsolved', [], []
+                    else:
+                        return 'partially solved', mechanisms, self.cur_test_preds
                 else:
                     return 'unsolved', [], []
             else:
@@ -190,28 +203,28 @@ class Inductive:
             for m in these_coords:
                 coord = m[1]
                 cur = self.cur_test_preds[n][coord[0]][coord[1]]
-                if cur == self.token_to_colors[0][change_tuple[0]]:
-                    self.cur_test_preds[n][coord[0]][coord[1]] = self.token_to_colors[0][change_tuple[1]]
+                if change_tuple[0] in self.test_token_to_color.keys() and change_tuple[1] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
+                    self.cur_test_preds[n][coord[0]][coord[1]] = self.test_token_to_color[change_tuple[1]]
 
     def apply_direct_transformation(self, change_tuple):
         for x in range(len(self.cur_test_preds)):
             for n in range(self.cur_test_preds[x].shape[0]):
                 for m in range(self.cur_test_preds[x].shape[1]):
                     cur = self.cur_test_preds[x][n][m]
-                    if cur == self.token_to_colors[0][change_tuple[0]]:
-                        self.cur_test_preds[x][n][m] = self.token_to_colors[0][change_tuple[1]]
+                    if change_tuple[0] in self.test_token_to_color.keys() and change_tuple[1] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
+                        self.cur_test_preds[x][n][m] = self.test_token_to_color[change_tuple[1]]
         return
 
-
-    def get_mechanism_preds(self, signal_): # signal_ = b above
+    def get_mechanism_preds(self, signal_, direct = False): # signal_ = b above
         mechanisms = set()
+        decided_change_tuples = set()
         for n in self.running_objective:
             if len(n) > 2:
-                if n[2] == 'direct':
+                if n[2] == 'direct' and direct:
                     mechanisms.add(n[2])
                     self.apply_direct_transformation((n[0], n[1]))
                     # in cur_test_preds, replace n[0] with n[1]
-                else:
+                elif n[2] != 'direct':
                     mechanisms.add(n[2])
                     if n[2] == 'cap_all':
                         this_signal = signal_[2]
@@ -222,14 +235,24 @@ class Inductive:
 
                     if n[3][0] == n[3][1]:
                         coords = [x[1] for x in this_signal]
-                        self.objectively_build_a_prediction(n[4], coords)
+                        if n[4] not in decided_change_tuples:
+                            decided_change_tuples.add(n[4])
+                            self.objectively_build_a_prediction(n[4], coords)
+
                     elif n[4][0] == n[4][1]:
                         coords = [x[0] for x in this_signal]
-                        self.objectively_build_a_prediction(n[3], coords)
+                        if n[3] not in decided_change_tuples:
+                            decided_change_tuples.add(n[3])
+                            self.objectively_build_a_prediction(n[3], coords)
                     else:
-                        uncap_coords = [x[0] for x in this_signal]
-                        self.objectively_build_a_prediction(n[3], uncap_coords)
-                        cap_coords = [x[1] for x in this_signal]
-                        self.objectively_build_a_prediction(n[4], cap_coords)
+                        if n[3] not in decided_change_tuples and n[4] not in decided_change_tuples: # we can't repeat assignments, very imp precondition
+                            uncap_coords = [x[0] for x in this_signal]
+                            if n[3] not in decided_change_tuples:
+                                decided_change_tuples.add(n[3])
+                                self.objectively_build_a_prediction(n[3], uncap_coords)
+                            cap_coords = [x[1] for x in this_signal]
+                            if n[4] not in decided_change_tuples:
+                                decided_change_tuples.add(n[4])
+                                self.objectively_build_a_prediction(n[4], cap_coords)
 
         return sorted(list(mechanisms))

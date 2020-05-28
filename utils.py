@@ -60,7 +60,6 @@ def fix_dim(arr):
 
 # get training: only gets the trainining inputs and outputs: there is phase_0 evaluation on the raw_task['test'] and there is phase_1 evaluation on the evaluation set train and there is a phase_2 evaluation on the evaluation set test and there is a phase_3 evaluation on the test set train and finally there is a phase_4 evaluation on the test set test (ultimate)
 
-
 def get_training(raw_task):
         training = raw_task['train']
         num_train = len(training)
@@ -95,7 +94,6 @@ def get_testing(raw_task):
                 testoutputs.append(this_output)
         #assert len(traininputs) == len(trainoutputs)
         return testinputs, testoutputs
-
 
 # plotting a task
 def plot_task(task, plot_test=False):
@@ -172,7 +170,6 @@ def plot_task_eval(task, testpreds):
     plt.tight_layout()
     plt.show()
 
-
 ## instantiation of a task manager utilities
 def explore_dim_arrays(list_of_arrays):
     dim_zero_min = min([n.shape[0] for n in list_of_arrays])
@@ -184,14 +181,12 @@ def explore_dim_arrays(list_of_arrays):
 
     return [(dim_zero_min, dim_zero_max, dim_zero_range), (dim_one_min, dim_one_max, dim_one_range)]
 
-
 def explore_dimensions(traininputs, trainoutputs):
     is_similar_dim = all([n.shape == m.shape for n, m in zip(traininputs, trainoutputs)])
     input_dims = explore_dim_arrays(traininputs)
     output_dims = explore_dim_arrays(trainoutputs)
 
     return is_similar_dim, input_dims, output_dims
-
 
 def get_value_map(in_, out_): # for cells that change
     value_map = {}
@@ -216,7 +211,6 @@ def get_similars(in_, out_): # for cells that stay
             value_map[in_[n[0], n[1]]].add(out_[n[0], n[1]])
 
     return value_map
-
 
 def get_target_values(value_map):
     all_values = []
@@ -248,7 +242,6 @@ def get_global_value_map(list_of_value_maps):
 
     return global_vm
 
-
 # get cell neighbours
 # https://www.kaggle.com/arsenynerinovsky/cellular-automata-as-a-language-for-reasoning
 nbh = lambda x, i, j: { #x is array, i and j are row and column indices
@@ -262,7 +255,6 @@ def get_background(arr):
     bincount = np.bincount(arr.flatten())
     major = bincount.argmax()
     return major
-
 
 # Tests based on prior knowledge
 # process_diff gives insights about the bg and the nonbg
@@ -289,7 +281,6 @@ def process_diff_spatial(in_, out_, in_bg):
 
     return sorted(list(overall_set))
 
-
 def get_non_bg_set_situation(in_val_list, out_val_list, bg):
     in_val_list = [x for x in in_val_list if x != bg]
     out_val_list = [x for x in out_val_list if x != bg]
@@ -305,7 +296,6 @@ def get_common_nonbg_inputs(traininputs_vals):
     # else:
     #     s &= set(e)
     return reduce((lambda x,y: x & y), map(set, traininputs_vals)) #s
-
 
 def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg, priority_nonbg):
     priority_nonbg_list = sorted(list(set([x for x in priority_nonbg if x != bg])))
@@ -337,10 +327,24 @@ def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg, prio
 
     return col_to_token
 
+def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg):
+    final_test_nonbg = [x for x in final_test_nonbg if x != bg]
+    col_to_token = {}
+    col_to_token[bg] = 'bg'
+
+    for key in pr_tokens.keys():
+        if key in final_test_nonbg:
+            col_to_token[key] = pr_tokens[key]
+
+    for n in range(len(final_test_nonbg)):
+        if final_test_nonbg[n] not in col_to_token.keys():
+            cur_len = len(col_to_token)
+            col_to_token[final_test_nonbg[n]] = 'nonbg' + str(cur_len-1)
+
+    return col_to_token
 
 def get_token_to_color_class_C(col_to_token):
     return {v: k for k, v in col_to_token.items()}
-
 
 def get_problem_statement_class_C(col_to_token, couple_value_map):
     problem_statement = []
@@ -440,7 +444,6 @@ def get_this_objective(cur_graph):
         leveraged.add(n[1])
     combs = [[x] for x in cur_graph if x not in leveraged and x[0] != x[1]] + combs
     return combs
-
 
 # The following examine simple matrix rotations and mirroring
 def get_diagonal_mirror(arr):

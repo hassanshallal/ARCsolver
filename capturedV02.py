@@ -108,7 +108,6 @@ def captured_situation_target(maze, test_points, bg):
 
     return [len(captured_ver_hor[1]) == len(test_points), len(captured_diag[1]) == len(test_points), len(captured_all[1]) == len(test_points)]
 
-
 def captured_situation_whole_interior(maze, arr, n, m, bg, order_, captured):
     if arr[n][m] != bg: # in order to operate also on non-bg cells
         arr[n][m] = bg

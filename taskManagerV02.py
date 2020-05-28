@@ -127,7 +127,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
         else:
             return ['ARCsolver doesn can not generate sets out of the problem graph yet.'], ['This requires a different mindset!']
 
-
     # what are the pairs to be resolved
     def get_objectives(self):
         if type(self.problem_graph[0]) != str:
@@ -157,8 +156,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         else:
             return ['ARCsolver can not generate an objective for this task yet.'], 'None'
-
-
 
     # simple print utilities
     def brief_task(self):
