@@ -191,45 +191,56 @@ def retrieve_coords_from_assignments(target_tuple, asssignments_output):
     return results
 
 def check_objective_against_captured(asssignments_output, objective, bg, traininputs):
-    objective = deepcopy(objective)
-    for n in range(len(objective)):
-        this_check = objective[n]
-        if len(this_check) == 1:
-            objective[n] = (this_check[0][0], this_check[0][1], 'direct')
-        elif len(this_check) == 2:
-            first_target_coords = retrieve_coords_from_assignments(this_check[0], asssignments_output)
-            second_target_coords = retrieve_coords_from_assignments(this_check[1], asssignments_output)
-            if len(first_target_coords) == len(second_target_coords):
-                for m in range(len(first_target_coords)):
-                    first_target_result = captured_situation_target(traininputs[m], first_target_coords[m], bg)
-                    second_target_result = captured_situation_target(traininputs[m], second_target_coords[m], bg)
-                    comparison = [x != y  for x, y in zip(first_target_result, second_target_result)]
-                    if comparison[2]:
-                        if first_target_result[2] and not second_target_result[2]:
-                            cap = (this_check[0])
-                            uncap = (this_check[1])
-                        elif not first_target_result[2] and second_target_result[2]:
-                            cap = (this_check[1])
-                            uncap = (this_check[0])
-                        objective[n] = (this_check[0], this_check[1], 'cap_all', uncap, cap)
-                        continue
-                    elif comparison[0] or comparison[1]:
-                        if comparison[0]:
-                            target, method = 0, 'cap_ver_hor'
-                        else:
-                            target, method = 1, 'cap_diag'
-                        if first_target_result[target] and not second_target_result[target]:
-                            cap = (this_check[0])
-                            uncap = (this_check[1])
-                        elif not first_target_result[target] and second_target_result[target]:
-                            cap = (this_check[1])
-                            uncap = (this_check[0])
-                        objective[n] = (this_check[0], this_check[1], method, uncap, cap)
-                        continue
-
-    return objective
+    copy_objective = deepcopy(objective)
+    changed = False
+    if not is_list_of_list_of_list(copy_objective):
+        changed = True
+        copy_objective = [copy_objective]
+    for x in range(len(copy_objective)):
+        for n in range(len(copy_objective[x])):
+            this_check = copy_objective[x][n]
+            if len(this_check) == 1:
+                copy_objective[x][n] = [this_check[0][0], this_check[0][1], 'direct']
+            elif len(this_check) == 2:
+                first_target_coords = retrieve_coords_from_assignments(this_check[0], asssignments_output)
+                second_target_coords = retrieve_coords_from_assignments(this_check[1], asssignments_output)
+                if len(first_target_coords) == len(second_target_coords):
+                    for m in range(len(first_target_coords)):
+                        first_target_result = captured_situation_target(traininputs[m], first_target_coords[m], bg)
+                        second_target_result = captured_situation_target(traininputs[m], second_target_coords[m], bg)
+                        comparison = [x != y  for x, y in zip(first_target_result, second_target_result)]
+                        if comparison[2]:
+                            if first_target_result[2] and not second_target_result[2]:
+                                cap = (this_check[0])
+                                uncap = (this_check[1])
+                            elif not first_target_result[2] and second_target_result[2]:
+                                cap = (this_check[1])
+                                uncap = (this_check[0])
+                            copy_objective[x][n] = [this_check[0], this_check[1], 'cap_all', uncap, cap]
+                            continue
+                        elif comparison[0] or comparison[1]:
+                            if comparison[0]:
+                                target, method = 0, 'cap_ver_hor'
+                            else:
+                                target, method = 1, 'cap_diag'
+                            if first_target_result[target] and not second_target_result[target]:
+                                cap = (this_check[0])
+                                uncap = (this_check[1])
+                            elif not first_target_result[target] and second_target_result[target]:
+                                cap = (this_check[1])
+                                uncap = (this_check[0])
+                            copy_objective[x][n] = [this_check[0], this_check[1], method, uncap, cap]
+                            continue
+    if changed:
+        return copy_objective[0]
+    else:
+        return copy_objective
 
 def assess_captured_target_training(asssignments_output, objective, bg, traininputs, testinputs):
+    # this objective concept may not work for tasks of many objectives, task 60 is an example of this
+    if len(objective) > 5:
+        return objective, []
+
     new_objective = check_objective_against_captured(asssignments_output, objective, bg, traininputs)
     if new_objective != objective:
         test_rep = assess_captured_holistic_testing(testinputs, bg)

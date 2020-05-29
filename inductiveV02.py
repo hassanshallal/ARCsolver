@@ -4,15 +4,18 @@ from utils import *
 from capturedV02 import *
 
 class Inductive:
-    def __init__(self, traininputs, trainoutputs, testinputs, objective_status, objective, asssignments_output, bg, token_to_colors, testoutputs = None):
+    def __init__(self, traininputs, trainoutputs, testinputs, objective_status, objective, assignments_leads, asssignments_output, bg, token_to_colors, size_sorted_nonbg, int_anchor_vals, testoutputs = None):
         self.traininputs = traininputs
         self.trainoutputs = trainoutputs
         self.testinputs = testinputs
         self.objective_status = objective_status
         self.objective = objective
+        self.assignments_leads = assignments_leads
         self.asssignments_output = asssignments_output
         self.bg = bg
         self.token_to_colors = token_to_colors
+        self.size_sorted_nonbg = size_sorted_nonbg
+        self.int_anchor_vals = int_anchor_vals
         self.testoutputs = testoutputs
 
         # These are important and can be retrieved anytime
@@ -31,18 +34,13 @@ class Inductive:
             if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
                 return self.token_to_colors[0]
             else:
-                pr_tokens = {}
-                for n in self.token_to_colors:
-                    for k, v in n.items():
-                        if 'pr' in k:
-                            pr_tokens[v] = k
-                if len(pr_tokens) > 0: # this is the only way to transfer
-                    testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
-                    final_test_nonbg = sorted(list(get_common_nonbg_inputs(testinputs_vals)))
-                    test_color_to_token = get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, self.bg)
-                    return get_token_to_color_class_C(test_color_to_token)
-                else:
-                    return {}
+                pr_tokens = get_priority_token(self.token_to_colors)
+                testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
+                final_test_nonbg = sorted(list(get_common_nonbg_inputs(testinputs_vals)))
+                test_color_to_token = get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals[0], self.testinputs[0])
+                return get_token_to_color_class_C(test_color_to_token)
+# if len(pr_tokens) > 0: # this is the only way to transfer
+# else: return {}
 
     def inductive_strategy(self): # method for an instance of induction:
         # output: x = solved/unsolved, y = mechanisms (functions to apply), testpreds (preds to plot)
@@ -169,7 +167,7 @@ class Inductive:
                         return 'solved', ['cap_diag', 'one_unique_captured'], [[l] for l in n[1]]
                 return 'unsolved', [], []
 
-        elif self.objective_status == 'obd' or  self.objective_status == 'red':
+        else:
             a, b =  assess_captured_target_training(self.asssignments_output, self.running_objective, self.bg, self.traininputs, self.testinputs)
             # we need to create outputs out of the modified objective and the b (testinputs as sets)
             if len(b) > 0:
@@ -193,17 +191,22 @@ class Inductive:
                     return 'unsolved', [], []
             else:
                 return 'unsolved', [], []
-        elif self.objective_status == 'pred' or self.objective_status == 'irr':
-            return 'unsolved', [], []
 
     def objectively_build_a_prediction(self, change_tuple, coordinates):
         assert(len(coordinates) == len(self.cur_test_preds))
+        # this is to cover colors to only show in the output and to get it from the training!
+        if change_tuple[1] not in self.test_token_to_color.keys():
+            for x in self.token_to_colors:
+                for k, v in x.items():
+                    if change_tuple[1] == k:
+                        self.test_token_to_color[change_tuple[1]] = v
+
         for n in range(len(coordinates)):
             these_coords = coordinates[n]
             for m in these_coords:
                 coord = m[1]
                 cur = self.cur_test_preds[n][coord[0]][coord[1]]
-                if change_tuple[0] in self.test_token_to_color.keys() and change_tuple[1] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
+                if change_tuple[0] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
                     self.cur_test_preds[n][coord[0]][coord[1]] = self.test_token_to_color[change_tuple[1]]
 
     def apply_direct_transformation(self, change_tuple):
@@ -213,18 +216,50 @@ class Inductive:
                     cur = self.cur_test_preds[x][n][m]
                     if change_tuple[0] in self.test_token_to_color.keys() and change_tuple[1] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
                         self.cur_test_preds[x][n][m] = self.test_token_to_color[change_tuple[1]]
-        return
+
+
+    def set_test_expectations(self):
+        current_objective = deepcopy(self.running_objective)
+        assignments_leads = deepcopy(self.assignments_leads)
+        test_token_to_color = deepcopy(self.test_token_to_color)
+        if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
+            del test_token_to_color['bg']
+        if len(test_token_to_color) > len(current_objective):
+            diff = set(test_token_to_color.keys()) - get_bare_assignment_leads(assignments_leads)
+            for n in list(diff):
+                current_objective.append(expand_obj(deepcopy(current_objective[0]), n))
+            return current_objective
+        elif len(test_token_to_color) < len(current_objective):
+            target = set(test_token_to_color.keys())
+            new_objective = []
+            for n in list(target):
+                new_objective.append(find_target_obj(current_objective, n))
+            return new_objective
+        else: # this is a more difficult case where we need to really convolve more cognition
+            return self.running_objective
 
     def get_mechanism_preds(self, signal_, direct = False): # signal_ = b above
         mechanisms = set()
         decided_change_tuples = set()
+
+        # make sure you turn off first not last, this is an example of massaging an objective
+        for n in range(len(self.running_objective)-1):
+            if len(self.running_objective[n]) == 3 and len(self.running_objective[n+1]) == 3 and (self.running_objective[n][1] == 'bg' or self.running_objective[n+1][1] == 'bg'):
+                temp = self.running_objective[n]
+                self.running_objective[n] = self.running_objective[n+1]
+                self.running_objective[n+1] = temp
+
+        # this is a heuristic for red cases
+        if self.objective_status == 'red':
+            self.running_objective = self.set_test_expectations()
+
         for n in self.running_objective:
             if len(n) > 2:
                 if n[2] == 'direct' and direct:
                     mechanisms.add(n[2])
                     self.apply_direct_transformation((n[0], n[1]))
                     # in cur_test_preds, replace n[0] with n[1]
-                elif n[2] != 'direct':
+                elif n[2] in ['cap_all', 'cap_ver_hor', 'cap_diag']:
                     mechanisms.add(n[2])
                     if n[2] == 'cap_all':
                         this_signal = signal_[2]

@@ -170,6 +170,12 @@ def plot_task_eval(task, testpreds):
     plt.tight_layout()
     plt.show()
 
+def is_list_of_list_of_list(this_list):
+    if len(this_list) > 0 and len(this_list[0]) > 0:
+        return type(this_list) == list and type(this_list[0]) == list and type(this_list[0][0]) == list
+    else:
+        return False
+
 ## instantiation of a task manager utilities
 def explore_dim_arrays(list_of_arrays):
     dim_zero_min = min([n.shape[0] for n in list_of_arrays])
@@ -327,19 +333,35 @@ def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg, prio
 
     return col_to_token
 
-def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg):
-    final_test_nonbg = [x for x in final_test_nonbg if x != bg]
+def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testpred):
+    modified_combs = set()
+    for n in remaining_test_nonbg:
+        modified_combs.add((n, np.count_nonzero(testpred == n)))
+    modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1])
+    modified_combs = [x[0] for x in modified_combs]
+    return modified_combs
+
+def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, int_anchor_vals, testpred):
+    final_test_nonbg = [x for x in final_test_nonbg if x != bg and x not in int_anchor_vals]
     col_to_token = {}
     col_to_token[bg] = 'bg'
 
     for key in pr_tokens.keys():
-        if key in final_test_nonbg:
             col_to_token[key] = pr_tokens[key]
+            if key in final_test_nonbg:
+                final_test_nonbg.remove(key)
+
+    if len(size_sorted_nonbg) > 0:
+        size_sorted_vals = get_size_sorted_nonbg_vals_test(final_test_nonbg, testpred)
+        for n in range(len(size_sorted_vals)):
+            if size_sorted_vals[n] not in col_to_token.keys() and n < len(size_sorted_nonbg):
+                col_to_token[size_sorted_vals[n]] = size_sorted_nonbg[n]
 
     for n in range(len(final_test_nonbg)):
         if final_test_nonbg[n] not in col_to_token.keys():
             cur_len = len(col_to_token)
             col_to_token[final_test_nonbg[n]] = 'nonbg' + str(cur_len-1)
+
 
     return col_to_token
 
@@ -414,15 +436,19 @@ def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_
 
     differences_indices = [i for i, val in enumerate(problem_graph) if val[0] != val[1] and type(val[0]) == str]
     differences = [problem_graph[x] for x in differences_indices]
+
     # set generation with cooridinates in all couples
     assignments_leads = sorted(list(set([x[0] for x in differences])))
     num_assignemnts  = len(assignments_leads)
     asssignments_output = []
+    int_anchor_vals = []
 
     for n in range(num_assignemnts):
         this_assignemnt = {}
         for x in int_anchors:
             this_assignemnt[('int_anchor', x)] = get_coordinates_of_tuple(x, in_, out_)
+            int_anchor_vals.append(x[0])
+
         for x in token_anchors:
             if x[0] == assignments_leads[n]:
                 this_assignemnt[('token_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
@@ -433,7 +459,7 @@ def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_
                 this_assignemnt[('diff_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
         asssignments_output.append(this_assignemnt)
 
-    return assignments_leads, asssignments_output
+    return assignments_leads, int_anchor_vals, asssignments_output
 
 def get_this_objective(cur_graph):
     combs = sorted(list(combinations(sorted(cur_graph), 2)))
@@ -444,6 +470,48 @@ def get_this_objective(cur_graph):
         leveraged.add(n[1])
     combs = [[x] for x in cur_graph if x not in leveraged and x[0] != x[1]] + combs
     return combs
+
+def get_priority_token(token_to_colors):
+    pr_tokens = {}
+    for n in token_to_colors:
+        for k, v in n.items():
+            if 'pr' in k:
+                pr_tokens[v] = k
+    return pr_tokens
+
+def is_all_nonbg_in_cur_obj(Current_objective):
+    for n in range(len(Current_objective)):
+        this_obj = Current_objective[n]
+        for x in this_obj:
+            if type(x) == tuple and x[0] == 'bg':
+                return False
+    return True
+
+def get_bare_assignment_leads(assignments_leads):
+    bare_assignment_leads = set()
+    for n in assignments_leads:
+        for x in n:
+            bare_assignment_leads.add(x)
+    return bare_assignment_leads
+
+def expand_obj(objective, diff_element):
+    for n in range(len(objective)):
+        if type(objective[n]) == tuple and 'nonbg' in objective[n][0]:
+            if objective[n][0] != objective[n][1]:
+                carry = objective[n][1]
+            else:
+                carry = diff_element
+            objective[n] = (diff_element, carry)
+    return objective
+
+def find_target_obj(Current_objective, target_element):
+    for n in range(len(Current_objective)):
+        objective = deepcopy(Current_objective[n])
+        for n in range(len(objective)):
+            if type(objective[n]) == tuple and objective[n][0] == target_element:
+                return objective
+    return None
+
 
 # The following examine simple matrix rotations and mirroring
 def get_diagonal_mirror(arr):

@@ -69,11 +69,12 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.priority_nonbg_output = sorted(list(get_common_nonbg_inputs(self.trainoutputs_vals)))
         self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
         self.problem_graph = self.express_problem_graph()
-        self.assignments_leads, self.asssignments_output = self.generate_set_assignemtns()
+        self.assignments_leads, self.int_anchor_vals, self.asssignments_output = self.generate_set_assignemtns()
         self.objective, self.objective_status = self.get_objectives()
+        self.size_sorted_nonbg = self.get_size_sorted_nonbg()
 
         # induction
-        self.inductiveV02 = Inductive(self.traininputs, self.trainoutputs, self.testinputs, self.objective_status, self.objective, self.asssignments_output, self.bg, self.token_to_colors, self.testoutputs)
+        self.inductiveV02 = Inductive(self.traininputs, self.trainoutputs, self.testinputs, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.bg, self.token_to_colors, self.size_sorted_nonbg, self.int_anchor_vals, self.testoutputs)
         self.inductiveV02.inductive_strategy()
 
     # Methods
@@ -105,7 +106,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 problem_graph.append((color_to_tokens[n], color_to_tokens[n]))
             else:
                 if n in traininput and n in trainoutput:
-                    problem_graph.append((n, n)) # this ciuld be a relevant anchor nonbg
+                    problem_graph.append((n, n)) # this could be a relevant anchor nonbg
         return problem_graph
 
     # apply from_problem_statement_to_a_problem_graph to the task
@@ -119,13 +120,15 @@ class TaskManager: # works on a task by task level, there are checks and balance
         if len(self.problem_graph) > 0 and type(self.problem_graph[0]) == list:
             results = [generate_set_assignemtns_per_graph(problem_graph, token_to_colors, traininput, trainoutput) for problem_graph, token_to_colors, traininput, trainoutput in zip(self.problem_graph, self.token_to_colors, self.traininputs, self.trainoutputs)]
             assignments_leads = []
+            int_anchore_vals = []
             asssignments_output = []
             for n in range(len(results)):
-                assignments_leads.append(results[n][0])
-                asssignments_output.append(results[n][1])
-            return assignments_leads, asssignments_output
+                assignments_leads.append(tuple(results[n][0]))
+                int_anchore_vals.append(tuple(results[n][1]))
+                asssignments_output.append(results[n][2])
+            return assignments_leads, int_anchore_vals, asssignments_output
         else:
-            return ['ARCsolver doesn can not generate sets out of the problem graph yet.'], ['This requires a different mindset!']
+            return ['ARCsolver doesn can not generate sets out of the problem graph yet.'], [], ['This requires a different mindset!']
 
     # what are the pairs to be resolved
     def get_objectives(self):
@@ -134,19 +137,21 @@ class TaskManager: # works on a task by task level, there are checks and balance
             for n in self.problem_graph:
                 copy_problem_graph.append(tuple(sorted([y for y in n if type(y[0]) == str])))
 
-            copy_problem_graph = list(set(copy_problem_graph))
+            copy_problem_graph = sorted(list(set(copy_problem_graph)))
             if len(copy_problem_graph) == 1:
                 return get_this_objective(copy_problem_graph[0]), 'obd' # one by default
             elif len(copy_problem_graph) > 1:
-                current_boss = []
-                copy_problem_graph = sorted(copy_problem_graph, key=len, reverse=False)
+                current_boss = set()
                 for n in range(len(copy_problem_graph)-1):
                     if set(copy_problem_graph[n]).issubset(set(copy_problem_graph[n + 1])):
-                        if len(current_boss) > 0 and current_boss[len(current_boss) - 1] != copy_problem_graph[n+1]:
-                            current_boss.append(copy_problem_graph[n+1])
+                        if len(current_boss) > 0:
+                            if copy_problem_graph[n] in current_boss:
+                                current_boss.remove(copy_problem_graph[n])
+                            if copy_problem_graph[n+1] not in current_boss:
+                                current_boss.add(copy_problem_graph[n+1])
                         elif len(current_boss) == 0:
-                            current_boss.append(copy_problem_graph[n+1])
-
+                            current_boss.add(copy_problem_graph[n+1])
+                current_boss = list(current_boss)
                 if len(current_boss) == 0:
                     return copy_problem_graph, 'irr'# this is another level of difficulty I guess, irreducible
                 elif len(current_boss)  == 1:
@@ -156,6 +161,50 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         else:
             return ['ARCsolver can not generate an objective for this task yet.'], 'None'
+
+    def get_size_sorted_nonbg(self):
+        assignments_leads_set = set()
+        handles_set = set()
+        modified_combs = set()
+        if type(self.assignments_leads[0]) != str:
+            # get handles_list
+            for x in self.assignments_leads:
+                for l in x:
+                    if 'nonbg' in l and 'pr' not in l:
+                        handles_set.add(l)
+            if len(handles_set) > 0:
+                handle_list = list(handles_set)
+                # if you have a handle list, get a dict_of_lengths based on the training
+                dict_of_lengths = {}
+                for x in range(len(handle_list)):
+                    this_target = handle_list[x]
+                    for m in range(len(self.asssignments_output)):
+                        for d in self.asssignments_output[m]:
+                            for k, v in d.items():
+                                if this_target == k[1][0]:
+                                    if this_target not in  dict_of_lengths.keys():
+                                        dict_of_lengths[this_target] = []
+                                    dict_of_lengths[this_target] =  dict_of_lengths[this_target] + [len(l) for l in v]
+
+
+                lists_of_lengths = list(dict_of_lengths.values())
+                if not all([x == lists_of_lengths[0] for x in lists_of_lengths]) and \
+                       all([len(x) == len(lists_of_lengths[0]) for x in lists_of_lengths]) and \
+                       len(lists_of_lengths) > 1:
+                    combs = list(combinations(handle_list, 2))
+
+                    for n in range(len(combs)):
+                        if all([x > y for x, y in zip(dict_of_lengths[combs[n][0]], dict_of_lengths[combs[n][1]])]):
+                            modified_combs.add((combs[n][1], sum(dict_of_lengths[combs[n][1]])))
+                            modified_combs.add((combs[n][0], sum(dict_of_lengths[combs[n][0]])))
+                        elif all([x < y for x, y in zip(dict_of_lengths[combs[n][0]], dict_of_lengths[combs[n][1]])]):
+                            modified_combs.add((combs[n][1], sum(dict_of_lengths[combs[n][1]])))
+                            modified_combs.add((combs[n][0], sum(dict_of_lengths[combs[n][0]])))
+                    modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1])
+                    modified_combs = [x[0] for x in modified_combs]
+        return modified_combs
+
+
 
     # simple print utilities
     def brief_task(self):
