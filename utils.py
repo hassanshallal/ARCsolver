@@ -342,6 +342,7 @@ def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testpred):
     return modified_combs
 
 def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, int_anchor_vals, testpred):
+    int_anchor_vals = list(reduce((lambda z,y: z & y), map(set, int_anchor_vals)))
     final_test_nonbg = [x for x in final_test_nonbg if x != bg and x not in int_anchor_vals]
     col_to_token = {}
     col_to_token[bg] = 'bg'
@@ -361,7 +362,6 @@ def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_n
         if final_test_nonbg[n] not in col_to_token.keys():
             cur_len = len(col_to_token)
             col_to_token[final_test_nonbg[n]] = 'nonbg' + str(cur_len-1)
-
 
     return col_to_token
 

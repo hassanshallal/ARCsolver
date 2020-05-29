@@ -37,7 +37,7 @@ class Inductive:
                 pr_tokens = get_priority_token(self.token_to_colors)
                 testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
                 final_test_nonbg = sorted(list(get_common_nonbg_inputs(testinputs_vals)))
-                test_color_to_token = get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals[0], self.testinputs[0])
+                test_color_to_token = get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
                 return get_token_to_color_class_C(test_color_to_token)
 # if len(pr_tokens) > 0: # this is the only way to transfer
 # else: return {}
@@ -222,6 +222,7 @@ class Inductive:
         current_objective = deepcopy(self.running_objective)
         assignments_leads = deepcopy(self.assignments_leads)
         test_token_to_color = deepcopy(self.test_token_to_color)
+
         if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
             del test_token_to_color['bg']
         if len(test_token_to_color) > len(current_objective):
@@ -248,14 +249,13 @@ class Inductive:
                 temp = self.running_objective[n]
                 self.running_objective[n] = self.running_objective[n+1]
                 self.running_objective[n+1] = temp
-
         # this is a heuristic for red cases
-        if self.objective_status == 'red':
+        if self.objective_status == 'red' or (self.objective_status == 'obd' and all([len(x) == 5 for x in self.running_objective])): # In case of 'obd' cases, the test expectation is not read to handle unsatisfiable objectives
             self.running_objective = self.set_test_expectations()
 
         for n in self.running_objective:
             if len(n) > 2:
-                if n[2] == 'direct' and direct:
+                if n[2] == 'direct' and direct: # Major hyperparameter candidate
                     mechanisms.add(n[2])
                     self.apply_direct_transformation((n[0], n[1]))
                     # in cur_test_preds, replace n[0] with n[1]

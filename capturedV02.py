@@ -1,4 +1,7 @@
 
+# solved: 1, 97, 119, 186, 250, 293, 337, 345
+# needs other first principles: 43, 84, 101, 124, 155, 159, 203, 366 
+
 from utils import *
 
 # captured_astar(grid, x, y, bg, all_) # recursive done

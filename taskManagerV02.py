@@ -120,13 +120,13 @@ class TaskManager: # works on a task by task level, there are checks and balance
         if len(self.problem_graph) > 0 and type(self.problem_graph[0]) == list:
             results = [generate_set_assignemtns_per_graph(problem_graph, token_to_colors, traininput, trainoutput) for problem_graph, token_to_colors, traininput, trainoutput in zip(self.problem_graph, self.token_to_colors, self.traininputs, self.trainoutputs)]
             assignments_leads = []
-            int_anchore_vals = []
+            int_anchor_vals = []
             asssignments_output = []
             for n in range(len(results)):
                 assignments_leads.append(tuple(results[n][0]))
-                int_anchore_vals.append(tuple(results[n][1]))
+                int_anchor_vals.append(tuple(results[n][1]))
                 asssignments_output.append(results[n][2])
-            return assignments_leads, int_anchore_vals, asssignments_output
+            return assignments_leads, int_anchor_vals, asssignments_output
         else:
             return ['ARCsolver doesn can not generate sets out of the problem graph yet.'], [], ['This requires a different mindset!']
 
