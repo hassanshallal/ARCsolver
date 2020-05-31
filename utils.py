@@ -11,10 +11,7 @@ from functools import reduce
 
 from deductiveV02 import *
 
-
-
 # This utils.py is not supposed to be related to any logic
-
 # This is to serialize the opjects
 def serialize(object_, name):
     outfile = open(name, 'wb')
@@ -169,6 +166,12 @@ def plot_task_eval(task, testpreds):
 
     plt.tight_layout()
     plt.show()
+
+def is_list_of_list(this_list):
+    if len(this_list) > 0 and len(this_list[0]) > 0:
+        return type(this_list) == list and type(this_list[0]) == list
+    else:
+        return False
 
 def is_list_of_list_of_list(this_list):
     if len(this_list) > 0 and len(this_list[0]) > 0:
@@ -342,7 +345,10 @@ def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testpred):
     return modified_combs
 
 def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, int_anchor_vals, testpred):
-    int_anchor_vals = list(reduce((lambda z,y: z & y), map(set, int_anchor_vals)))
+    int_anchor_vals = [x for x in int_anchor_vals if len(x) > 0]
+    if len(int_anchor_vals) > 0:
+        int_anchor_vals = list(reduce((lambda z,y: z & y), map(set, int_anchor_vals)))
+
     final_test_nonbg = [x for x in final_test_nonbg if x != bg and x not in int_anchor_vals]
     col_to_token = {}
     col_to_token[bg] = 'bg'
@@ -461,6 +467,19 @@ def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_
 
     return assignments_leads, int_anchor_vals, asssignments_output
 
+def is_list_one_value(list_ex):
+    return all([x == list_ex[0] for x in list_ex])
+
+def is_list_equal_1(list_ex):
+    return all([x == 1 for x in list_ex])
+
+def get_set_of_values_1(this_dict):
+    values = set()
+    target = this_dict[1]
+    for n in range(len(target)):
+        values.add(target[n][0])
+    return values
+
 def get_this_objective(cur_graph):
     combs = sorted(list(combinations(sorted(cur_graph), 2)))
     combs = [list(x) for x in combs if x[0][0] == x[1][0]]
@@ -512,7 +531,15 @@ def find_target_obj(Current_objective, target_element):
                 return objective
     return None
 
-
+def retrieve_coords_from_assignments(target_tuple, asssignments_output):
+    results = []
+    for n in range(len(asssignments_output)): # len num_train
+        for x in range(len(asssignments_output[n])): # assignment
+            this_assignment = asssignments_output[n][x]
+            for k, v in this_assignment.items():
+                if target_tuple == k[1]:
+                    results.append(v[0])
+    return results
 # The following examine simple matrix rotations and mirroring
 def get_diagonal_mirror(arr):
     arr = fix_dim(arr)

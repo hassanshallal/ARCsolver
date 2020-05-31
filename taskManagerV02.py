@@ -204,8 +204,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
                     modified_combs = [x[0] for x in modified_combs]
         return modified_combs
 
-
-
     # simple print utilities
     def brief_task(self):
         # if type(self.asssignments_output[0]) == list:

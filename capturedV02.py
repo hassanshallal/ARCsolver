@@ -1,6 +1,6 @@
 
 # solved: 1, 97, 119, 186, 250, 293, 337, 345
-# needs other first principles: 43, 84, 101, 124, 155, 159, 203, 366 
+# needs other first principles: 43, 84, 101, 124, 155, 159, 203, 366
 
 from utils import *
 
@@ -65,7 +65,6 @@ def captured_astar_util(arr, n, m, bg, all_):
 # captured_situation_target(maze, test_points) # return boolean list of three checks (ver_hot, diag, all)
 # captured_situation_whole_interior(maze, arr, n, m, bg, order_, captured)
 # captured_situation_whole(maze, bg) # return three dictionaries ver_hot, diag, all, each with two keys: 0: uncaptured coordinates and 1: captured coordinates
-
 # get a list of points on the edges
 def get_edge_set(maze):
     dim_0 = maze.shape[0]
@@ -182,16 +181,6 @@ def assess_captured_holistic_testing(testinputs, bg = None):
         test_task_output_all.append(all_)
 
     return [test_task_output_ver_hor, test_task_output_diag, test_task_output_all]
-
-def retrieve_coords_from_assignments(target_tuple, asssignments_output):
-    results = []
-    for n in range(len(asssignments_output)): # len num_train
-        for x in range(len(asssignments_output[n])): # assignment
-            this_assignment = asssignments_output[n][x]
-            for k, v in this_assignment.items():
-                if target_tuple == k[1]:
-                    results.append(v[0])
-    return results
 
 def check_objective_against_captured(asssignments_output, objective, bg, traininputs):
     copy_objective = deepcopy(objective)
