@@ -5,9 +5,11 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from itertools import permutations, combinations
+import itertools
+from itertools import permutations, combinations, product
 import numpy as np
 from functools import reduce
+
 
 from deductiveV02 import *
 
@@ -254,8 +256,8 @@ def get_global_value_map(list_of_value_maps):
 # get cell neighbours
 # https://www.kaggle.com/arsenynerinovsky/cellular-automata-as-a-language-for-reasoning
 nbh = lambda x, i, j: { #x is array, i and j are row and column indices
-    (ip, jp) : x[i+ip, j+jp]
-        for ip, jp in product([1, -1, 0], repeat=2)
+    (i+ip, j+jp) : x[i+ip, j+jp]
+        for ip, jp in itertools.product([1, -1, 0], repeat=2)
             if (0 <= i < x.shape[0]) and (0 <= j < x.shape[1]) and (0 <= i+ip < x.shape[0]) and (0 <= j+jp < x.shape[1])
 }
 
@@ -497,6 +499,41 @@ def get_priority_token(token_to_colors):
             if 'pr' in k:
                 pr_tokens[v] = k
     return pr_tokens
+
+def list_comparator(l1, l2):
+    if len(l1) == len(l2):
+        if all([x > y for x, y in zip(l1, l2)]):
+            return '>'
+        elif all([x < y for x, y in zip(l1, l2)]):
+            return '<'
+        elif all([x == y for x, y in zip(l1, l2)]):
+            return '=='
+        else:
+            return None
+    else:
+        return None
+
+def list_modulo(l1, l2):
+    if len(l1) == len(l2):
+        if all([x % y == 0 or y % x == 0 for x, y in zip(l1, l2)]):
+            return True
+        else:
+            return False
+    else:
+        return False
+
+# this is a terminal decision taken after a series of previous decisions
+def get_int_div(l1, l2):
+        return [y / x for x, y in zip(l1, l2)]
+
+def modify_dimensiosn(dimensions_list, multi_factor_list):
+    dimensions_list = deepcopy(dimensions_list)
+    if len(dimensions_list[0]) == len(multi_factor_list):
+        for n in range(len(dimensions_list)):
+            dimensions_list[n] = [int(x * y) for x, y in zip(dimensions_list[n], multi_factor_list)]
+        return dimensions_list
+    else:
+        return None
 
 def is_all_nonbg_in_cur_obj(Current_objective):
     for n in range(len(Current_objective)):

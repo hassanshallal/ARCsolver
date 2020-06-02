@@ -229,7 +229,11 @@ def check_objective_against_captured(asssignments_output, objective, bg, trainin
         return copy_objective
 
 def assess_captured_target_training(asssignments_output, objective, bg, traininputs, testinputs):
-    # this objective concept may not work for tasks of many objectives, task 60 is an example of this
+    # this objective concept may not work for tasks of so many objectives, task 60 is an example of this
+    # This type of tasks require a different framework based on symmetry and finding symmetric indices which
+    # by the way must be a pretty basic first principle operation requiring none of the long objective
+    # based screenings
+
     if len(objective) > 5:
         return objective, []
 

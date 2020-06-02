@@ -37,7 +37,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
             self.bg = int(self.bg) #it is coming as numpy.int64 not int
         else:
             self.global_bg = False
-            self.bg = list(traininputs_bg_set)
+            self.bg = self.traininputs_bg
 
 
         # Move into deduction saver 0
