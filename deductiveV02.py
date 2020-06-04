@@ -6,25 +6,6 @@ from z3 import Sum, sat, unsat, print_matrix, describe_tactics, describe_probes
 from z3 import And, Or, Xor, Not, Implies, Distinct,  FailIf, Then, Exists, With, If, Store
 from z3 import Optimize, solve, Solver, Function, Goal, Tactic, solve_using, Probe, Z3Exception, is_pattern
 
-# z3 or SAT derived knowledge is deductive
-# starts with a theory, confirms a hypothesis, tend to do quantitative operations
-# Deductive mindset: Theory-->prediction-->experiment
-# from general principle to special case
-
-# z3 or SAT derived knowledge is inductive because it has to start with the data
-# SAT treatment screens simple basic logical expressions against binary representations
-# of the problem and after applying this type of logical screening on all the data, it
-# should move in the direction of inferring conclusions such as most of the problems
-# ARC solver would face can be described as one of 11 found categories, which by the way beaten
-# our attempts to categorize into 4 then 5 then 6 cases, of course, our position after this foundation
-# is much different than our position before that.
-
-
-# The following provides a logical resource such as saver0 which allows the machine
-# to unsupervisedly classify the problems into 11 different types based on the
-# binary of the input against its background and the binary of the input against the Output
-# This seems sort of deductive but its interesting
-
 # This function finds logical operattors that represent a pixel change in regards to background and input-to-output transformation
 def logical_screen_0(in_, out_):
     x, y = Bools('x y')
@@ -38,11 +19,6 @@ def logical_screen_0(in_, out_):
         if s.check() == z3.z3.unsat:
             chosen.append(str(m).split('(')[0])
     return tuple(chosen)
-
-# Coding: non-changing bg: ['Implies', 'Not', 'Not']
-#             changing bg: ['Or', 'Xor', 'Implies', 'Not']
-#             changing nonbg: ['And', 'Or', 'Implies']
-#             non changing nonbg: ['Or', 'Xor', 'Not']
 
 saver0 = {}
 saver0[(True, True)] = logical_screen_0(True, True)
@@ -80,7 +56,6 @@ def logical_screen_1(in_, out_, out_extend_):  # out_extend:
                     chosen.append(l[0]+'And')
     return tuple(chosen)
 
-
 saver1 = {}
 saver1[(True, True, True)] = logical_screen_1(True, True, True)
 saver1[(True, True, False)] = logical_screen_1(True, True, False)
@@ -94,3 +69,28 @@ coder1[saver1[(True, True, False)]] = 'nonbg_C_bg'
 coder1[saver1[(True, False, False)]] = 'nonbg_S'
 coder1[saver1[(False, True, False)]] = 'bg_C'
 coder1[saver1[(False, False, False)]] = 'bg_S'
+
+
+# Coding: non-changing bg: ['Implies', 'Not', 'Not']
+#             changing bg: ['Or', 'Xor', 'Implies', 'Not']
+#             changing nonbg: ['And', 'Or', 'Implies']
+#             non changing nonbg: ['Or', 'Xor', 'Not']
+
+# z3 or SAT derived knowledge is deductive
+# starts with a theory, confirms a hypothesis, tend to do quantitative operations
+# Deductive mindset: Theory-->prediction-->experiment
+# from general principle to special case
+
+# z3 or SAT derived knowledge is inductive because it has to start with the data
+# SAT treatment screens simple basic logical expressions against binary representations
+# of the problem and after applying this type of logical screening on all the data, it
+# should move in the direction of inferring conclusions such as most of the problems
+# ARC solver would face can be described as one of 11 found categories, which by the way beaten
+# our attempts to categorize into 4 then 5 then 6 cases, of course, our position after this foundation
+# is much different than our position before that.
+
+
+# The following provides a logical resource such as saver0 which allows the machine
+# to unsupervisedly classify the problems into 11 different types based on the
+# binary of the input against its background and the binary of the input against the Output
+# This seems sort of deductive but its interesting

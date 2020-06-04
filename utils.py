@@ -338,15 +338,15 @@ def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg, prio
 
     return col_to_token
 
-def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testpred):
+def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testinput):
     modified_combs = set()
     for n in remaining_test_nonbg:
-        modified_combs.add((n, np.count_nonzero(testpred == n)))
+        modified_combs.add((n, np.count_nonzero(testinput == n)))
     modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1])
     modified_combs = [x[0] for x in modified_combs]
     return modified_combs
 
-def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, int_anchor_vals, testpred):
+def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, int_anchor_vals, testinput):
     int_anchor_vals = [x for x in int_anchor_vals if len(x) > 0]
     if len(int_anchor_vals) > 0:
         int_anchor_vals = list(reduce((lambda z,y: z & y), map(set, int_anchor_vals)))
@@ -361,7 +361,7 @@ def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_n
                 final_test_nonbg.remove(key)
 
     if len(size_sorted_nonbg) > 0:
-        size_sorted_vals = get_size_sorted_nonbg_vals_test(final_test_nonbg, testpred)
+        size_sorted_vals = get_size_sorted_nonbg_vals_test(final_test_nonbg, testinput)
         for n in range(len(size_sorted_vals)):
             if size_sorted_vals[n] not in col_to_token.keys() and n < len(size_sorted_nonbg):
                 col_to_token[size_sorted_vals[n]] = size_sorted_nonbg[n]

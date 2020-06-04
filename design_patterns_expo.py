@@ -289,7 +289,6 @@ class PrimeFinderClient:
 
 # Template:
 class MakeMeal:
-
     def buy_ingredients(self, money):
         if money < self.cost:
             assert 0, 'Not enough money to buy ingredients!'

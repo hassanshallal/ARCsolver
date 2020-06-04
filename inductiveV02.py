@@ -1,92 +1,22 @@
 # should be able to get started with this very soon. may be or may be not.
 
 from utils import *
+from communicate import *
+
+from dimensionWork import *
 from capturedV02 import *
 
+
 class Inductive:
-    def __init__(self, traininputs, trainoutputs, testinputs, objective_status, objective, assignments_leads, asssignments_output, bg, token_to_colors, size_sorted_nonbg, int_anchor_vals, testoutputs = None):
-        self.traininputs = traininputs
-        self.trainoutputs = trainoutputs
-        self.testinputs = testinputs
-        self.objective_status = objective_status
-        self.objective = objective
-        self.assignments_leads = assignments_leads
-        self.asssignments_output = asssignments_output
-        self.bg = bg
-        self.token_to_colors = token_to_colors
-        self.size_sorted_nonbg = size_sorted_nonbg
-        self.int_anchor_vals = int_anchor_vals
-        self.testoutputs = testoutputs
-
-        # data members to understand dimensions situation
-        self.traininput_shapes = [list(x.shape) for x in self.traininputs]
-        self.trainoutputs_shapes = [list(x.shape) for x in self.trainoutputs]
-        self.testinput_shapes = [list(x.shape) for x in self.testinputs]
-
-        self.is_sim_in_shapes = all([x.shape == self.traininputs[0].shape for x in self.traininputs])
-        self.is_sim_out_shapes = all([x.shape == self.trainoutputs[0].shape for x in self.trainoutputs])
-
-        self.is_same_ndim_couple = all([len(x) == len(y) for x, y in zip(self.traininput_shapes, self.trainoutputs_shapes)])
-        self.is_same_dim_couple = all([x == y for x, y in zip(self.traininput_shapes, self.trainoutputs_shapes)])
-
-        self.what_relation = [list_comparator(x, y) for x, y in zip(self.traininput_shapes, self.trainoutputs_shapes)]
-        self.same_relation = all([x == self.what_relation[0] for x in self.what_relation]) and self.what_relation[0] != None
-        self.unidirctional = all([list_modulo(x, y) for x, y in zip(self.traininput_shapes, self.trainoutputs_shapes)])
-        self.in_mult_fact = [get_int_div(x, y) for x, y in zip(self.traininput_shapes, self.trainoutputs_shapes)]
-        self.is_sim_int_div = all([x == self.in_mult_fact[0] for x in self.in_mult_fact])
-        self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.in_mult_fact])
-
-        self.dimension_status, self.output_dim_preds = self.cognify_dimensions()
+    def __init__(self, communication):
+        self.communication = communication
 
         # These are important and can be retrieved anytime
-        self.running_objective = deepcopy(self.objective)
-        self.cur_train_preds = deepcopy(self.traininputs)
-        self.cur_test_preds = deepcopy(self.testinputs)
+        self.running_objective = deepcopy(self.communication.objective)
+        self.cur_test_preds = deepcopy(self.communication.testinputs)
 
-        # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
-        self.test_token_to_color = self.get_test_token_to_color()
-
-        # Induction
-        self.solved, self.mechanisms, self.testpreds = self.inductive_strategy()
-
-    def cognify_dimensions(self):
-        if self.is_same_ndim_couple and self.is_same_dim_couple:
-            return 'deduced', [tuple(x.shape) for x in self.testinputs]
-
-        elif self.is_same_ndim_couple and not self.is_same_dim_couple:
-            if self.same_relation and (self.what_relation[0] == '>' or self.what_relation[0] == '<'):
-                if self.unidirctional and self.is_sim_int_div:
-                    return 'deduced', [tuple(x) for x in modify_dimensiosn(self.testinput_shapes, self.in_mult_fact[0])]
-                elif self.unidirctional and not self.is_sim_int_div:
-                    if self.is_sim_out_shapes:
-                        return 'deduced', [tuple(self.trainoutputs_shapes[0])] * len(self.testinputs)
-                    else:
-                        if self.is_sim_internal_int_div:
-                            return 'partially deduced', [tuple(x) for x in self.testinput_shapes]
-        return 'undeduced', [tuple(x) for x in self.testinput_shapes]
-
-    def assess_num_unique_nonbg(self, test_list):
-        traininputs_vals = [np.unique(n).tolist() for n in self.traininputs]
-        testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
-
-        if type(self.bg) == int:
-            [y.remove(self.bg) for y in traininputs_vals] # we need to remove bg here
-            len_unique_traininputs_nonbg = [len(y) for y in traininputs_vals]
-            if len_unique_traininputs_nonbg == test_list:
-                [y.remove(self.bg) for y in testinputs_vals]
-                return True, [len(y) for y in testinputs_vals]
-        return False, []
-
-    def get_test_token_to_color(self):
-        if len(self.token_to_colors) > 0:
-            if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
-                return self.token_to_colors[0]
-            else:
-                pr_tokens = get_priority_token(self.token_to_colors)
-                testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
-                final_test_nonbg = sorted(list(get_common_nonbg_inputs(testinputs_vals)))
-                test_color_to_token = get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
-                return get_token_to_color_class_C(test_color_to_token)
+        # cognify and analyze dimensions using dimensionWork
+        self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
 
     def first_principles_diff_dim_checks(self, *args):
         for n in args:
@@ -143,35 +73,11 @@ class Inductive:
         else:
             return False, []
 
-    def objectively_build_a_prediction(self, change_tuple, coordinates):
-        assert(len(coordinates) == len(self.cur_test_preds))
-        # this is to cover colors to only show in the output and to get it from the training!
-        if change_tuple[1] not in self.test_token_to_color.keys():
-            for x in self.token_to_colors:
-                for k, v in x.items():
-                    if change_tuple[1] == k:
-                        self.test_token_to_color[change_tuple[1]] = v
-
-        for n in range(len(coordinates)):
-            these_coords = coordinates[n]
-            for m in these_coords:
-                coord = m[1]
-                cur = self.cur_test_preds[n][coord[0]][coord[1]]
-                if change_tuple[0] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
-                    self.cur_test_preds[n][coord[0]][coord[1]] = self.test_token_to_color[change_tuple[1]]
-
-    def apply_direct_transformation(self, change_tuple):
-        for x in range(len(self.cur_test_preds)):
-            for n in range(self.cur_test_preds[x].shape[0]):
-                for m in range(self.cur_test_preds[x].shape[1]):
-                    cur = self.cur_test_preds[x][n][m]
-                    if change_tuple[0] in self.test_token_to_color.keys() and change_tuple[1] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
-                        self.cur_test_preds[x][n][m] = self.test_token_to_color[change_tuple[1]]
-
+    # The following are supposed to be generic, unfortunately  get_mechanism_preds is geared towards captured module
     def set_test_expectations(self):
         current_objective = deepcopy(self.running_objective)
-        assignments_leads = deepcopy(self.assignments_leads)
-        test_token_to_color = deepcopy(self.test_token_to_color)
+        assignments_leads = deepcopy(self.communication.assignments_leads)
+        test_token_to_color = deepcopy(self.communication.test_token_to_color)
 
         if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
             del test_token_to_color['bg']
@@ -181,15 +87,43 @@ class Inductive:
             for n in list(diff):
                 current_objective.append(expand_obj(deepcopy(current_objective[0]), n))
             return current_objective
-        elif len(test_token_to_color) < len(current_objective):
+        if len(test_token_to_color) < len(current_objective):
             target = set(test_token_to_color.keys())
             new_objective = []
             for n in list(target):
                 new_objective.append(find_target_obj(current_objective, n))
             return new_objective
-        else: # this is a more difficult case where we need to really convolve more cognition
-            return self.running_objective
 
+        return current_objective # this is a more difficult case where we need to really convolve more cognition
+
+    def objectively_build_a_prediction(self, change_tuple, coordinates):
+        assert(len(coordinates) == len(self.cur_test_preds))
+
+        # this is to cover colors to only show in the output and to get it from the training!
+        # We tokenized testinputs based on the traininputs
+        if change_tuple[1] not in self.communication.test_token_to_color.keys():
+            for x in self.communication.token_to_colors:
+                for k, v in x.items():
+                    if change_tuple[1] == k:
+                        self.communication.test_token_to_color[change_tuple[1]] = v
+
+        for n in range(len(coordinates)):
+            these_coords = coordinates[n]
+            for m in these_coords:
+                coord = m[1]
+                cur = self.cur_test_preds[n][coord[0]][coord[1]]
+                if change_tuple[0] in self.communication.test_token_to_color.keys() and cur == self.communication.test_token_to_color[change_tuple[0]]:
+                    self.cur_test_preds[n][coord[0]][coord[1]] = self.communication.test_token_to_color[change_tuple[1]]
+
+    def apply_direct_transformation(self, change_tuple):
+        for x in range(len(self.cur_test_preds)):
+            for n in range(self.cur_test_preds[x].shape[0]):
+                for m in range(self.cur_test_preds[x].shape[1]):
+                    cur = self.cur_test_preds[x][n][m]
+                    if change_tuple[0] in self.communication.test_token_to_color.keys() and change_tuple[1] in self.communication.test_token_to_color.keys() and cur == self.communication.test_token_to_color[change_tuple[0]]:
+                        self.cur_test_preds[x][n][m] = self.communication.test_token_to_color[change_tuple[1]]
+
+    # generalize get_mechanism_preds
     def get_mechanism_preds(self, signal_, direct = False): # signal_ = b above
         mechanisms = set()
         decided_change_tuples = set()
@@ -202,7 +136,7 @@ class Inductive:
                 self.running_objective[n+1] = temp
 
         # this is a heuristic for red cases
-        if self.objective_status == 'red' or (self.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])): # In case of 'obd' cases, the test expectation is not read to handle unsatisfiable objectives
+        if self.communication.objective_status == 'red' or (self.communication.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])): # In case of 'obd' cases, the test expectation is not read to handle unsatisfiable objectives
             self.running_objective = self.set_test_expectations()
 
         for n in self.running_objective:
@@ -244,97 +178,14 @@ class Inductive:
 
         return sorted(list(mechanisms))
 
+    # The following is the screening protocola which needs alot of cleaning
     # ya the screen dimensions is a scary method, needs a lot of work now gets: 222, 268, 288, 306
-    def screen_dimesnions(self):
-        if  self.dimension_status == 'undeduced':
-            return 'unsolved', [], self.cur_test_preds
-        elif self.is_same_ndim_couple and not self.is_same_dim_couple and self.same_relation and self.unidirctional:
-            if self.is_sim_int_div:
-                if int(self.in_mult_fact[0][0]) != 0 and int(self.in_mult_fact[0][1]) != 0:
-                    is_expanded = all([np.all(np.repeat(np.repeat(x, int(y[0]), 0), int(y[1]), 1) == z) for x, y, z in zip(self.traininputs, self.in_mult_fact, self.trainoutputs)])
-                else:
-                    is_expanded =  False
-
-                if int(1/self.in_mult_fact[0][0]) != 0 and int(1/self.in_mult_fact[0][1]) != 0:
-                    is_contracted = all([np.all(x[::int(1/y[0]),::int(1/y[1])] == z) for x, y, z in zip(self.traininputs, self.in_mult_fact, self.trainoutputs)])
-                else:
-                    is_contracted = False
-                if is_expanded or is_contracted:
-                    if len(self.testinputs) == 1:
-                        this_in_mult_fact = [self.in_mult_fact[0]]
-                    elif len(self.testinputs) > 1:
-                        this_in_mult_fact = self.in_mult_fact[0] * len(self.testinputs)
-
-                    if is_expanded:
-                        cur_preds = [np.repeat(np.repeat(x, int(y[0]), 0), int(y[1]), 1) for x, y in zip(self.testinputs, this_in_mult_fact)]
-                    elif is_contracted:
-                        cur_preds = [x[::int(1/y[0]),::int(1/y[1])] for x, y in zip(self.testinputs, this_in_mult_fact)]
-
-                    if self.testoutputs:
-                        test_evaluated = all([np.array_equal(x, y) for x, y in zip(cur_preds, self.testoutputs)])
-                    else:
-                        test_evaluated = False
-
-                    if test_evaluated:
-                        return 'solved', ['is_exp_cont', self.in_mult_fact[0]], cur_preds
-                    else:
-                        return 'partially solved', ['is_exp_cont', self.in_mult_fact[0]], self.cur_test_preds
-
-            elif not self.is_sim_out_shapes and self.is_sim_internal_int_div:
-                candidate_factors = [x[0] for x in self.in_mult_fact]
-                if all([int(x) != 0 for x in candidate_factors]):
-                    is_expanded = all([np.all(np.repeat(np.repeat(x, int(y), 0), int(y), 1) == z) for x, y, z in zip(self.traininputs, candidate_factors, self.trainoutputs)])
-                else:
-                    is_expanded =  False
-                if all([int(1/x) != 0 for x in candidate_factors]):
-                    is_contracted = all([np.all(x[::int(1/y),::int(1/y)] == z) for x, y, z in zip(self.traininputs, candidate_factors, self.trainoutputs)])
-                else:
-                    is_contracted =  False
-                if is_expanded or is_contracted:
-                    r1, r2 = self.assess_num_unique_nonbg(candidate_factors)
-                    if r1:
-                        if is_expanded:
-                            cur_preds = [np.repeat(np.repeat(x, y, 0), y, 1) for x, y in zip(self.testinputs, [r2] * len(self.testinputs))]
-                        elif is_contracted:
-                            cur_preds = [x[::int(1/y),::int(1/y)] for x, y in zip(self.testinputs, [r2] * len(self.testinputs))]
-                        if self.testoutputs:
-                            test_evaluated = all([np.array_equal(x, y) for x, y in zip(cur_preds, self.testoutputs)])
-                        else:
-                            test_evaluated = False
-
-                        if test_evaluated:
-                            return 'solved', ['is_exp_cont_freq_unique_nonbg', candidate_factors], cur_preds
-                        else:
-                            return 'partially solved', ['is_exp_cont_freq_unique_nonbg', candidate_factors], self.cur_test_preds
-
-        return 'unsolved', [], self.cur_test_preds
-
-    def screen_flips(self):
-        # check on training
-        are_flips = [screen_flips_rotation(in_, out_) for in_, out_ in zip(self.traininputs, self.trainoutputs)] # this took care of train validation
-        if all([x[0] != False for x in are_flips]) and all([x[0] == are_flips[0][0] for x in are_flips]):
-            if are_flips[0][1] != None:
-                cur_preds = [are_flips[0][0](x, are_flips[0][1]) for x in self.cur_test_preds]
-            else:
-                cur_preds = [are_flips[0][0](x) for x in self.cur_test_preds]
-
-            if self.testoutputs:
-                test_evaluated = all([np.array_equal(x, y) for x, y in zip(cur_preds, self.testoutputs)])
-            else:
-                test_evaluated = False
-
-            if test_evaluated:
-                return 'solved', [(are_flips[0][0], are_flips[0][1])], cur_preds
-            elif not test_evaluated:
-                return 'partially solved', [(are_flips[0][0], are_flips[0][1])], self.cur_test_preds
-        else:
-            return 'unsolved', [], self.cur_test_preds
-
+    # screen dimensions
     def screen_captured(self): # This is abstract
-        if self.objective_status == 'None':
-            unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
+        if self.communication.objective_status == 'None':
+            unique_train_outputs = [np.unique(x).tolist() for x in self.communication.trainoutputs]
             is_unique_train_outputs = [len(x) == 1 for x in unique_train_outputs]
-            a, b = assess_captured_holistic_training(self.traininputs, self.testinputs)
+            a, b = assess_captured_holistic_training(self.communication.traininputs, self.communication.testinputs)
             if not self.first_principles_diff_dim_checks(a) or not all(is_unique_train_outputs):
                 return 'unsolved', [], []
             else:
@@ -353,22 +204,22 @@ class Inductive:
                 return 'unsolved', [], []
 
         else:
-            a, b =  assess_captured_target_training(self.asssignments_output, self.running_objective, self.bg, self.traininputs, self.testinputs)
+            a, b =  assess_captured_target_training(self.communication.asssignments_output, self.running_objective, self.communication.bg, self.communication.traininputs, self.communication.testinputs)
             # we need to create outputs out of the modified objective and the b (testinputs as sets)
             if len(b) > 0:
                 self.running_objective = a
                 objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
                 if all(objective_satisfiability):
                     mechanisms = self.get_mechanism_preds(b, True)
-                    if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testoutputs)]):
+                    if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testoutputs)]):
                         return 'solved', mechanisms, self.cur_test_preds
-                    elif any([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testinputs)]):
+                    elif any([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testinputs)]):
                         return 'unsolved', [], []
                     else:
                         return 'partially solved', mechanisms, self.cur_test_preds
                 elif any(objective_satisfiability):
                     mechanisms = self.get_mechanism_preds(b)
-                    if any([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.testinputs)]):
+                    if any([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testinputs)]):
                         return 'unsolved', [], []
                     else:
                         return 'partially solved', mechanisms, self.cur_test_preds
@@ -377,20 +228,22 @@ class Inductive:
             else:
                 return 'unsolved', [], []
 
-    def inductive_strategy(self): # method for an instance of induction:
-        # output: x = solved/unsolved, y = mechanisms (functions to apply), testpreds (preds to plot)
-        # flips:
-        x, y, z = self.screen_dimesnions()
-        if x != 'unsolved':
-            return x, y, z
+    def inductive_strategy(self): # we will change this into a multilane highway and a find_path
+    # routines on samples to decide whether to send a positive or a negative feedback so as to stop
 
-        x, y, z = self.screen_flips()
-        if x != 'unsolved':
-            return x, y, z
+        # try dimension related
+        self.solved, self.mechanisms, self.cur_test_preds = self.dimensionWork.screen_dimesnions()
+        if self.solved == 'solved':
+            return
 
-        # screen captured:
-        x, y, z = self.screen_captured()
-        if x != 'unsolved':
-            return x, y, z
+        # try flips related
+        self.solved, self.mechanisms, self.cur_test_preds = self.dimensionWork.screen_flips()
+        if self.solved == 'solved':
+            return
 
-        return 'unsolved', [], []
+        # try captured related
+        self.solved, self.mechanisms, self.cur_test_preds = self.screen_captured()
+        if self.solved == 'solved':
+            return
+
+        return

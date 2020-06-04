@@ -1,6 +1,8 @@
 # Be subtle and abstract
 # lists are the container we will use to handle different couples, etc
 from utils import *
+from communicate import *
+
 from inductiveV02 import *
 
 class TaskManager: # works on a task by task level, there are checks and balances
@@ -18,67 +20,74 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.is_similar_dim, self.input_dims, self.output_dims = explore_dimensions(self.traininputs, self.trainoutputs)
         self.traininputs_vals = [np.unique(n).tolist() for n in self.traininputs]
         self.trainoutputs_vals = [np.unique(n).tolist() for n in self.trainoutputs]
+        self.testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
+
         self.couple_val_map = [get_value_map(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
         self.global_value_map = get_global_value_map(self.couple_val_map)
         self.couple_similars = [get_similars(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
         self.global_similars = get_global_value_map(self.couple_similars)
 
         # prepare relevant info for your tests conditionally on presence of testoutputs
-        self.testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
-
         self.traininputs_bg = [get_background(n) for n in self.traininputs]
         self.testinputs_bg = [get_background(n) for n in self.testinputs]
 
-
-        traininputs_bg_set = set(self.traininputs_bg)
-        if len(traininputs_bg_set) == 1:
-            self.global_bg = True
-            self.bg = traininputs_bg_set.pop()
-            self.bg = int(self.bg) #it is coming as numpy.int64 not int
-        else:
-            self.global_bg = False
-            self.bg = self.traininputs_bg
-
-
-        # Move into deduction saver 0
-        if self.is_similar_dim and type(self.bg) == int: #self.global_input_bg != None:
-            situation  = [process_diff(n, m, self.bg) for n, m in zip(self.traininputs, self.trainoutputs)]
-            #print('situation is: ', situation)
-            situation_set  = set([str(tuple(n)) for n in situation])
-            if len(situation_set) == 1:
-                self.deductive_coder0 = situation[0]
-            else:
-                self.deductive_coder0 = None
-        else:
-            self.deductive_coder0 = None
-
-        # Move into deduction saver 1
-        if self.is_similar_dim and type(self.bg) == int: #self.global_input_bg != None:
-            situation_spatial  = [process_diff_spatial(n, m, self.bg) for n, m in zip(self.traininputs, self.trainoutputs)]
-            #print('situation_spatial is: ', situation_spatial)
-            situation_set  = set([str(tuple(n)) for n in situation_spatial])
-            if len(situation_set) == 1:
-                self.deductive_coder1 = situation_spatial[0]
-            else:
-                self.deductive_coder1 = None
-        else:
-            self.deductive_coder1 = None
+        # assess bg and apply deductive routines to the task
+        self.global_bg, self.bg = self.assess_bg_situation()
+        self.deductive_coder0, self.deductive_coder1 = self.expose_deductive()
 
         # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
         self.priority_nonbg_input = sorted(list(get_common_nonbg_inputs(self.traininputs_vals)))
         self.priority_nonbg_output = sorted(list(get_common_nonbg_inputs(self.trainoutputs_vals)))
         self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
+
+        # problem description
         self.problem_graph = self.express_problem_graph()
         self.assignments_leads, self.int_anchor_vals, self.asssignments_output = self.generate_set_assignemtns()
         self.objective, self.objective_status = self.get_objectives()
-        self.size_sorted_nonbg = self.get_size_sorted_nonbg()
 
+        # use above to tokenize the test and have a test_token_to_color_dict
+        self.size_sorted_nonbg = self.get_size_sorted_nonbg()
+        self.test_token_to_color = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
+
+
+        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testoutputs)
         # induction
-        self.inductiveV02 = Inductive(self.traininputs, self.trainoutputs, self.testinputs, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.bg, self.token_to_colors, self.size_sorted_nonbg, self.int_anchor_vals, self.testoutputs)
+        self.inductiveV02 = Inductive(self.communication)
         self.inductiveV02.inductive_strategy()
 
+
     # Methods
-    # This method tokenize a task
+
+    def assess_bg_situation(self):
+        traininputs_bg_set = set(self.traininputs_bg)
+        if len(traininputs_bg_set) == 1:
+            global_bg = True
+            bg = traininputs_bg_set.pop()
+            bg = int(bg) #it is coming as numpy.int64 not int
+        else:
+            global_bg = False
+            bg = self.traininputs_bg
+        return global_bg, bg
+    def expose_deductive(self):
+        if self.is_similar_dim and type(self.bg) == int:
+            situation  = [process_diff(n, m, self.bg) for n, m in zip(self.traininputs, self.trainoutputs)]
+            situation_set  = set([str(tuple(n)) for n in situation])
+            situation_spatial  = [process_diff_spatial(n, m, self.bg) for n, m in zip(self.traininputs, self.trainoutputs)]
+            situation_set_spatial  = set([str(tuple(n)) for n in situation_spatial])
+
+            if len(situation_set) == 1:
+                deductive_coder0 = situation[0]
+            else:
+                deductive_coder0 = None
+            if len(situation_set_spatial) == 1:
+                deductive_coder1 = situation_spatial[0]
+            else:
+                deductive_coder1 = None
+            return deductive_coder0, deductive_coder1
+        else:
+            return None, None
+
+    # This method tokenize a task based on training, it provides color_to_token, token_to_color, and problem_statements
     def tokenize(self):
         if self.is_similar_dim and self.global_bg: #self.tokenizer_class == 'C':
             color_to_tokens = [get_col_to_token_class_C(x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for x, y, z in zip(self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
@@ -98,7 +107,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
             #print('coming soon in a different taste!')
             return {}, {}, []
 
-    # This method provide a holistic problem graph of the task
+    # steps to generate an objective from problem_statements (problem_statement --> problem_graph --> objective )
     def from_problem_statement_to_a_problem_graph(self, problem_statement, color_to_tokens, token_to_colors, couple_similar, traininput, trainoutput):
         problem_graph = deepcopy(problem_statement)
         for n in couple_similar.keys():
@@ -108,29 +117,11 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 if n in traininput and n in trainoutput:
                     problem_graph.append((n, n)) # this could be a relevant anchor nonbg
         return problem_graph
-
-    # apply from_problem_statement_to_a_problem_graph to the task
     def express_problem_graph(self):
         if len(self.problem_statements) > 0 and type(self.problem_statements[0]) == list:
             return [self.from_problem_statement_to_a_problem_graph(problem_statement, color_to_tokens, token_to_colors, couple_similar, traininput, trainoutput) for problem_statement, color_to_tokens, token_to_colors, couple_similar, traininput, trainoutput in zip(self.problem_statements, self.color_to_tokens, self.token_to_colors, self.couple_similars, self.traininputs, self.trainoutputs)]
         else:
             return ['ARCsolver doesn can not express a problem graph yet.']
-
-    def generate_set_assignemtns(self):
-        if len(self.problem_graph) > 0 and type(self.problem_graph[0]) == list:
-            results = [generate_set_assignemtns_per_graph(problem_graph, token_to_colors, traininput, trainoutput) for problem_graph, token_to_colors, traininput, trainoutput in zip(self.problem_graph, self.token_to_colors, self.traininputs, self.trainoutputs)]
-            assignments_leads = []
-            int_anchor_vals = []
-            asssignments_output = []
-            for n in range(len(results)):
-                assignments_leads.append(tuple(results[n][0]))
-                int_anchor_vals.append(tuple(results[n][1]))
-                asssignments_output.append(results[n][2])
-            return assignments_leads, int_anchor_vals, asssignments_output
-        else:
-            return ['ARCsolver doesn can not generate sets out of the problem graph yet.'], [], ['This requires a different mindset!']
-
-    # what are the pairs to be resolved
     def get_objectives(self):
         if type(self.problem_graph[0]) != str:
             copy_problem_graph = []
@@ -162,6 +153,22 @@ class TaskManager: # works on a task by task level, there are checks and balance
         else:
             return ['ARCsolver can not generate an objective for this task yet.'], 'None'
 
+    # problem_graph --> assignments_leads, int_anchor_vals, asssignments_output
+    def generate_set_assignemtns(self):
+        if len(self.problem_graph) > 0 and type(self.problem_graph[0]) == list:
+            results = [generate_set_assignemtns_per_graph(problem_graph, token_to_colors, traininput, trainoutput) for problem_graph, token_to_colors, traininput, trainoutput in zip(self.problem_graph, self.token_to_colors, self.traininputs, self.trainoutputs)]
+            assignments_leads = []
+            int_anchor_vals = []
+            asssignments_output = []
+            for n in range(len(results)):
+                assignments_leads.append(tuple(results[n][0]))
+                int_anchor_vals.append(tuple(results[n][1]))
+                asssignments_output.append(results[n][2])
+            return assignments_leads, int_anchor_vals, asssignments_output
+        else:
+            return ['ARCsolver doesn can not generate sets out of the problem graph yet.'], [], ['This requires a different mindset!']
+
+    # Tokenize test according to tokenized_train
     def get_size_sorted_nonbg(self):
         assignments_leads_set = set()
         handles_set = set()
@@ -203,6 +210,16 @@ class TaskManager: # works on a task by task level, there are checks and balance
                     modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1])
                     modified_combs = [x[0] for x in modified_combs]
         return modified_combs
+    def get_test_token_to_color(self):
+        if len(self.token_to_colors) > 0:
+            if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
+                return self.token_to_colors[0]
+            else:
+                pr_tokens = get_priority_token(self.token_to_colors)
+                testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
+                final_test_nonbg = sorted(list(get_common_nonbg_inputs(testinputs_vals)))
+                test_color_to_token = get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
+                return get_token_to_color_class_C(test_color_to_token)
 
     # simple print utilities
     def brief_task(self):
@@ -214,9 +231,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
         #             print("end of assignment.")
         #         print("end of an option :).")
         # print(self.traininputs)
-        print(self.objective)
-        print(self.objective_status)
-        print(self.solved)
-        print(self.mechanisms)
+        # print(self.objective)
+        # print(self.objective_status)
+        # print(self.solved)
+        # print(self.mechanisms)
         #print(self.testpreds)
         print("=========")
