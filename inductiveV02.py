@@ -14,58 +14,14 @@ class Inductive:
         # These are important and can be retrieved anytime
         self.running_objective = deepcopy(self.communication.objective)
         self.cur_test_preds = deepcopy(self.communication.testinputs)
-
+        self.solved, self.mechanisms = 'unsolved', []
         # cognify and analyze dimensions using dimensionWork
         self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
-
-    def first_principles_diff_dim_checks(self, *args):
-        for n in args:
-            ext_len = len(n)
-            int_len = len(n[0])
-            for x in range(ext_len):
-                for y in range(int_len):
-                    if len(n[x][y][0]) == 0 or len(n[x][y][1]) == 0:
-                        return False
-        return True
-
-    def first_principles_diff_dim_signal_size(self, *args):
-        zero_signal = []
-        one_signal = []
-
-        for n in args:
-            ext_len = len(n)
-            int_len = len(n[0])
-            for x in range(ext_len):
-                for y in range(int_len):
-                    zero_signal.append(len(n[x][y][0]))
-                    one_signal.append(len(n[x][y][1]))
-
-        return zero_signal, one_signal
-
-    def first_principles_diff_dim_signal_class(self, results):
-        overall_cur_invest_num_unique = []
-        overall_cur_invest_unique = []
-        for n in range(len(results)): # 3 for captured
-            cur_invest = results[n]
-            cur_invest_num_unique = []
-            cur_invest_unique = []
-            for x in range(len(cur_invest)): # num_train
-                this_result = cur_invest[x]
-                values_1 = get_set_of_values_1(this_result)
-                cur_invest_num_unique.append(len(values_1))
-                if len(values_1) == 1:
-                    cur_invest_unique.append(values_1.pop())
-                else:
-                    cur_invest_unique.append(values_1)
-            overall_cur_invest_num_unique.append(cur_invest_num_unique)
-            overall_cur_invest_unique.append(cur_invest_unique)
-
-        return overall_cur_invest_num_unique, overall_cur_invest_unique
 
     def validate_cap(self, overall_cur_invest_num_unique, overall_cur_invest_unique, order_, unique_train_outputs, b):
         if is_list_equal_1(overall_cur_invest_num_unique[order_]):
             if overall_cur_invest_unique[order_] == unique_train_outputs:
-                test_num_unique, test_unique = self.first_principles_diff_dim_signal_class(b)
+                test_num_unique, test_unique = self.communication.first_principles_diff_dim_signal_class(b)
                 if is_list_equal_1(test_num_unique[order_]):
                     return True, test_unique
             else:
@@ -73,7 +29,7 @@ class Inductive:
         else:
             return False, []
 
-    # The following are supposed to be generic, unfortunately  get_mechanism_preds is geared towards captured module
+    # The following are supposed to be generic, unfortunately  infer_on_mechanism is geared towards captured module
     def set_test_expectations(self):
         current_objective = deepcopy(self.running_objective)
         assignments_leads = deepcopy(self.communication.assignments_leads)
@@ -123,8 +79,8 @@ class Inductive:
                     if change_tuple[0] in self.communication.test_token_to_color.keys() and change_tuple[1] in self.communication.test_token_to_color.keys() and cur == self.communication.test_token_to_color[change_tuple[0]]:
                         self.cur_test_preds[x][n][m] = self.communication.test_token_to_color[change_tuple[1]]
 
-    # generalize get_mechanism_preds
-    def get_mechanism_preds(self, signal_, direct = False): # signal_ = b above
+    # generalize infer_on_mechanism
+    def infer_on_mechanism(self, signal_, direct = False): # signal_ = b above
         mechanisms = set()
         decided_change_tuples = set()
 
@@ -186,12 +142,12 @@ class Inductive:
             unique_train_outputs = [np.unique(x).tolist() for x in self.communication.trainoutputs]
             is_unique_train_outputs = [len(x) == 1 for x in unique_train_outputs]
             a, b = assess_captured_holistic_training(self.communication.traininputs, self.communication.testinputs)
-            if not self.first_principles_diff_dim_checks(a) or not all(is_unique_train_outputs):
+            if not self.communication.first_principles_diff_dim_checks(a) or not all(is_unique_train_outputs):
                 return 'unsolved', [], []
             else:
                 if all(is_unique_train_outputs):
                     unique_train_outputs = [x[0] for x in unique_train_outputs]
-                    overall_cur_invest_num_unique, overall_cur_invest_unique = self.first_principles_diff_dim_signal_class(a)
+                    overall_cur_invest_num_unique, overall_cur_invest_unique = self.communication.first_principles_diff_dim_signal_class(a)
                     m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, 2, unique_train_outputs, b)
                     if m:
                         return 'solved', ['cap_all', 'one_unique_captured'], [[[l] for l in n[2]]]
@@ -210,7 +166,7 @@ class Inductive:
                 self.running_objective = a
                 objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
                 if all(objective_satisfiability):
-                    mechanisms = self.get_mechanism_preds(b, True)
+                    mechanisms = self.infer_on_mechanism(b, True)
                     if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testoutputs)]):
                         return 'solved', mechanisms, self.cur_test_preds
                     elif any([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testinputs)]):
@@ -218,7 +174,7 @@ class Inductive:
                     else:
                         return 'partially solved', mechanisms, self.cur_test_preds
                 elif any(objective_satisfiability):
-                    mechanisms = self.get_mechanism_preds(b)
+                    mechanisms = self.infer_on_mechanism(b)
                     if any([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testinputs)]):
                         return 'unsolved', [], []
                     else:
@@ -232,18 +188,21 @@ class Inductive:
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop
 
         # try dimension related
-        self.solved, self.mechanisms, self.cur_test_preds = self.dimensionWork.screen_dimesnions()
+        self.solved, self.mechanisms,  this_testpred = self.dimensionWork.screen_dimesnions()
         if self.solved == 'solved':
+            self.cur_test_preds = this_testpred
             return
 
         # try flips related
-        self.solved, self.mechanisms, self.cur_test_preds = self.dimensionWork.screen_flips()
+        self.solved, self.mechanisms, this_testpred = self.dimensionWork.screen_flips()
         if self.solved == 'solved':
+            self.cur_test_preds = this_testpred
             return
 
-        # try captured related
-        self.solved, self.mechanisms, self.cur_test_preds = self.screen_captured()
-        if self.solved == 'solved':
+        # try captured related, we will pass and recieve a modified running objective or none
+        self.solved, self.mechanisms,  this_test_pred = self.screen_captured()
+        if self.solved == 'solved' or self.solved == 'partially solved':
+            self.cur_test_preds = this_test_pred
             return
 
         return
