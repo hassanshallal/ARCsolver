@@ -59,6 +59,58 @@ class Communication:
 
         return overall_cur_invest_num_unique, overall_cur_invest_unique
 
+    # The following are supposed to be generic, unfortunately  infer_on_mechanism is geared towards captured module
+
+    def set_test_expectations(self, current_objective):
+        assignments_leads = deepcopy(self.assignments_leads)
+        test_token_to_color = deepcopy(self.test_token_to_color)
+
+        if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
+            del test_token_to_color['bg']
+
+        if len(test_token_to_color) > len(current_objective):
+            diff = set(test_token_to_color.keys()) - get_bare_assignment_leads(assignments_leads)
+            for n in list(diff):
+                current_objective.append(expand_obj(deepcopy(current_objective[0]), n))
+            return current_objective
+        if len(test_token_to_color) < len(current_objective):
+            target = set(test_token_to_color.keys())
+            new_objective = []
+            for n in list(target):
+                new_objective.append(find_target_obj(current_objective, n))
+            return new_objective
+
+        return current_objective # this is a more difficult case where we need to really convolve more cognition
+
+    def objectively_build_a_prediction(self, change_tuple, coordinates, cur_test_pred):
+        assert(len(coordinates) == len(cur_test_pred))
+
+        # this is to cover colors to only show in the output and to get it from the training!
+        # We tokenized testinputs based on the traininputs
+        if change_tuple[1] not in self.test_token_to_color.keys():
+            for x in self.token_to_colors:
+                for k, v in x.items():
+                    if change_tuple[1] == k:
+                        self.test_token_to_color[change_tuple[1]] = v
+
+        for n in range(len(coordinates)):
+            these_coords = coordinates[n]
+            for m in these_coords:
+                coord = m[1]
+                cur = cur_test_pred[n][coord[0]][coord[1]]
+                if change_tuple[0] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
+                    cur_test_pred[n][coord[0]][coord[1]] = self.test_token_to_color[change_tuple[1]]
+        return cur_test_pred
+
+    def apply_direct_transformation(self, change_tuple, cur_test_pred):
+        for x in range(len(cur_test_pred)):
+            for n in range(cur_test_pred[x].shape[0]):
+                for m in range(cur_test_pred[x].shape[1]):
+                    cur = cur_test_pred[x][n][m]
+                    if change_tuple[0] in self.test_token_to_color.keys() and change_tuple[1] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
+                        cur_test_pred[x][n][m] = self.test_token_to_color[change_tuple[1]]
+        return cur_test_pred
+
     def carry_along(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs

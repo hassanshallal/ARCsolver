@@ -11,7 +11,7 @@ import numpy as np
 from functools import reduce
 
 
-from deductiveV02 import *
+from deductive import *
 
 # This utils.py is not supposed to be related to any logic
 # This is to serialize the opjects
