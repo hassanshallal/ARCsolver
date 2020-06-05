@@ -1,11 +1,8 @@
-# should be able to get started with this very soon. may be or may be not.
-
 from utils import *
 from communicate import *
 
 from dimensionWork import *
 from captured import *
-
 
 class Inductive:
     def __init__(self, communication):
@@ -15,10 +12,10 @@ class Inductive:
         self.running_objective = deepcopy(self.communication.objective)
         self.cur_test_preds = deepcopy(self.communication.testinputs)
         self.solved, self.mechanisms = 'unsolved', []
+
         # cognify and analyze dimensions using dimensionWork
         self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
         self.captured = Captured(self.communication, self.running_objective, self.cur_test_preds)
-
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop

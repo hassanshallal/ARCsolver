@@ -1,4 +1,3 @@
-
 # solved: 1, 97, 119, 186, 250, 293, 337, 345
 # needs other first principles: 43, 84, 101, 124, 155, 159, 203, 366
 
@@ -231,10 +230,10 @@ class Captured:
             return self.running_objective, []
 
         new_objective = self.check_objective_against_captured(bg)
+        test_rep = []
         if new_objective != self.running_objective:
             test_rep = self.assess_captured_holistic_testing(bg)
-        else:
-            test_rep = []
+
         return new_objective, test_rep
 
     def validate_cap(self, overall_cur_invest_num_unique, overall_cur_invest_unique, order_, unique_train_outputs, b):
@@ -247,7 +246,6 @@ class Captured:
                 return False, []
         else:
             return False, []
-
 
     # generalize infer_on_mechanism
     def infer_on_mechanism(self, signal_, direct = False): # signal_ = b above
@@ -339,19 +337,18 @@ class Captured:
                 objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
 
                 if all(objective_satisfiability):
-                    mechanisms = self.infer_on_mechanism(b, True)
+                    mechanisms = self.infer_on_mechanism(b, True) # we shall trigger any direct at this point
                 elif any(objective_satisfiability):
-                    mechanisms = self.infer_on_mechanism(b)
+                    mechanisms = self.infer_on_mechanism(b, self.communication.turn_on_direct_premature) # This is a hyperparameter for mostly visualization purposes now
 
                 if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testoutputs)]):
                     is_solved = 'solved'
-                elif any(objective_satisfiability):
+                elif any([len(x) == 5 for x in a]):
                     is_solved = 'partially solved'
                 else:
                     is_solved = 'unsolved'
 
             return is_solved, mechanisms, self.cur_test_preds, self.running_objective
-
 
 # captured_astar(grid, x, y, bg, all_) # recursive done
 # captured_astar_util(arr, n, m, bg, all_), done

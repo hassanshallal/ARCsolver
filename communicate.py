@@ -1,5 +1,6 @@
 # this is a class that wraps important information in a single object to be passed to anyother class
 from utils import *
+
 class Communication:
     def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testoutputs = None):
         self.traininputs = traininputs
@@ -14,6 +15,9 @@ class Communication:
         self.token_to_colors = token_to_colors
         self.test_token_to_color = test_token_to_color
         self.testoutputs = testoutputs
+
+        # Hyperparameters for inductive or any of its modules can be passed here
+        self.turn_on_direct_premature = False
 
     def first_principles_diff_dim_checks(self, *args):
         for n in args:

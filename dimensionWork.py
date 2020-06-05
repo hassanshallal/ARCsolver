@@ -27,7 +27,6 @@ class DimensionWork:
 
         self.dimension_status, self.output_dim_preds = self.cognify_dimensions()
 
-
     def cognify_dimensions(self):
         if self.is_same_ndim_couple and self.is_same_dim_couple:
             return 'deduced', [tuple(x.shape) for x in self.communication.testinputs]
