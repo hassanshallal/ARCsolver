@@ -17,7 +17,7 @@ class Communication:
         self.testoutputs = testoutputs
 
         # Hyperparameters for inductive or any of its modules can be passed here
-        self.turn_on_direct_premature = False
+        self.turn_on_direct_premature = True
 
     def first_principles_diff_dim_checks(self, *args):
         for n in args:

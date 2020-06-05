@@ -343,7 +343,7 @@ class Captured:
 
                 if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testoutputs)]):
                     is_solved = 'solved'
-                elif any([len(x) == 5 for x in a]):
+                elif any(objective_satisfiability):
                     is_solved = 'partially solved'
                 else:
                     is_solved = 'unsolved'
