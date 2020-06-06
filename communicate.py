@@ -2,7 +2,7 @@
 from utils import *
 
 class Communication:
-    def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testoutputs = None):
+    def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, is_unique_output, testoutputs = None):
         self.traininputs = traininputs
         self.trainoutputs = trainoutputs
         self.testinputs = testinputs
@@ -14,11 +14,14 @@ class Communication:
         self.asssignments_output = asssignments_output
         self.token_to_colors = token_to_colors
         self.test_token_to_color = test_token_to_color
+        self.is_unique_output = is_unique_output
         self.testoutputs = testoutputs
 
-        # Hyperparameters for inductive or any of its modules can be passed here
-        self.turn_on_direct_premature = True
+        # The following data members are added along the way and used by other modules
+        # The following two data members will be updated with the dimensionWORK
 
+        # Hyperparameters for inductive or any of its modules can be passed here
+        # self.turn_on_direct_premature = False
     def first_principles_diff_dim_checks(self, *args):
         for n in args:
             ext_len = len(n)
@@ -77,15 +80,24 @@ class Communication:
             for n in list(diff):
                 current_objective.append(expand_obj(deepcopy(current_objective[0]), n))
             return current_objective
+
         if len(test_token_to_color) < len(current_objective):
-            target = set(test_token_to_color.keys())
             new_objective = []
+            for n in current_objective:
+                if len(n) == 3 and n[0] in test_token_to_color.keys():
+                    new_objective.append(n)
+
+            target = set(test_token_to_color.keys())
             for n in list(target):
-                new_objective.append(find_target_obj(current_objective, n))
+                is_found_obj = find_target_obj(current_objective, n)
+                if is_found_obj != None:
+                    new_objective.append(is_found_obj)
+
             return new_objective
 
         return current_objective # this is a more difficult case where we need to really convolve more cognition
 
+    # creating output with objectives
     def objectively_build_a_prediction(self, change_tuple, coordinates, cur_test_pred):
         assert(len(coordinates) == len(cur_test_pred))
 
@@ -115,7 +127,27 @@ class Communication:
                         cur_test_pred[x][n][m] = self.test_token_to_color[change_tuple[1]]
         return cur_test_pred
 
-    def carry_along(self, *args, **kwargs):
+    # Creating and populating output in cases with no objective:
+    def unobjectively_build_a_prediction(self, dimension_status, output_dim_preds, **kwargs):
+        if dimension_status == 'deduced':
+            cur_output = np.zeros(output_dim_preds)
+            for k, v in kwargs.items():
+                if k == 'one_unique_captured':
+                    cur_output += v
+                    cur_output = cur_output.astype(int)
+                return [y.tolist() for y in cur_output]
+        return None
+
+    # Transfer cargo
+    def carry_along_args(self, *args):
         self.args = args
-        self.kwargs = kwargs
-        retrun
+        return
+
+    def carry_along_kwargs(self, **kwargs):
+        for k, v in kwargs.items():
+            if k == 'dimension_status':
+                self.dimension_status = v
+            if k == 'output_dim_preds':
+                self.output_dim_preds = v
+
+        return

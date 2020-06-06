@@ -1,8 +1,11 @@
 # solved: 1, 97, 119, 186, 250, 293, 337, 345
 # needs other first principles: 43, 84, 101, 124, 155, 159, 203, 366
+# current_space = {'all_', 'ver_hor', 'diag'}
+# current_space.append('one_edge', 'two_edges', 'three_edges'), combine with their consequtive permutation
 
 from utils import *
 from communicate import *
+from cages import *
 
 def captured_astar(grid, x, y, bg, all_):
     if (x == 0 or y == 0 or x == grid.shape[0]-1 or y == grid.shape[1]-1) and grid[x][y] == bg:
@@ -51,6 +54,8 @@ def captured_astar(grid, x, y, bg, all_):
 class Captured:
     def __init__(self, communication, running_objective, cur_test_preds):
         self.communication = communication
+
+        # print(self.communication.dimension_status, self.communication.output_dim_preds)
         self.running_objective = running_objective
         self.cur_test_preds = cur_test_preds
 
@@ -226,7 +231,7 @@ class Captured:
         # by the way must be a pretty basic first principle operation requiring none of the long objective
         # based screenings
 
-        if len(self.running_objective) > 5:
+        if len(self.running_objective) > 20:
             return self.running_objective, []
 
         new_objective = self.check_objective_against_captured(bg)
@@ -247,20 +252,34 @@ class Captured:
         else:
             return False, []
 
-    # generalize infer_on_mechanism
+    def iterate_validating_cap(self, overall_cur_invest_num_unique, overall_cur_invest_unique, b, a):
+        for x in [2, 0, 1]:
+            m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, x, self.communication.is_unique_output, b)
+            if m:
+                this_output = [self.communication.unobjectively_build_a_prediction(self.communication.dimension_status, k, one_unique_captured = l) for k, l in zip(self.communication.output_dim_preds, n[x])]
+                if x == 2:
+                    return 'solved', ['cap_all', 'one_unique_captured'], this_output, None
+                elif x == 0:
+                    return 'solved', ['cap_ver_hor', 'one_unique_captured'], this_output, None
+                elif x == 1:
+                    return 'solved', ['cap_diag', 'one_unique_captured'], this_output, None
+        return 'objective initiated', ['captured_cells_detected'], self.cur_test_preds, [a, b]
+
+# generalize infer_on_mechanism
     def infer_on_mechanism(self, signal_, direct = False): # signal_ = b above
         mechanisms = set()
         decided_change_tuples = set()
 
         # make sure you turn off first not last, this is an example of massaging an objective
         for n in range(len(self.running_objective)-1):
-            if len(self.running_objective[n]) == 3 and len(self.running_objective[n+1]) == 3 and (self.running_objective[n][1] == 'bg' or self.running_objective[n+1][1] == 'bg'):
+            if len(self.running_objective[n]) == 3 and len(self.running_objective[n+1]) == 3 and (self.running_objective[n][1] != 'bg' and self.running_objective[n+1][1] == 'bg'):
                 temp = self.running_objective[n]
                 self.running_objective[n] = self.running_objective[n+1]
                 self.running_objective[n+1] = temp
 
         # this is a heuristic for red cases
-        if self.communication.objective_status == 'red' or (self.communication.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])): # In case of 'obd' cases, the test expectation is not read to handle unsatisfiable objectives
+        if self.communication.objective_status == 'red' or (self.communication.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])):
+            # In case of 'obd' cases, the test expectation is not ready to handle unsatisfiable objectives
             self.running_objective = self.communication.set_test_expectations(self.running_objective)
 
         for n in self.running_objective:
@@ -306,32 +325,19 @@ class Captured:
     # ya the screen dimensions is a scary method, needs a lot of work now gets: 222, 268, 288, 306
     # screen dimensions
     def screen_captured(self): # This is abstract
-        if self.communication.objective_status == 'None':
-            unique_train_outputs = [np.unique(x).tolist() for x in self.communication.trainoutputs]
-            is_unique_train_outputs = [len(x) == 1 for x in unique_train_outputs]
+        if self.communication.objective_status == 'None' or self.communication.is_unique_output != None:
             a, b = self.assess_captured_holistic_training()
-            if not self.communication.first_principles_diff_dim_checks(a) or not all(is_unique_train_outputs):
+            if not self.communication.first_principles_diff_dim_checks(a) or self.communication.is_unique_output == None:
                 return 'unsolved', [], [], None
             else:
-                if all(is_unique_train_outputs):
-                    unique_train_outputs = [x[0] for x in unique_train_outputs]
-                    overall_cur_invest_num_unique, overall_cur_invest_unique = self.communication.first_principles_diff_dim_signal_class(a)
-                    m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, 2, unique_train_outputs, b)
-                    if m:
-                        return 'solved', ['cap_all', 'one_unique_captured'], [[[l] for l in n[2]]], None
-                    m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, 0, unique_train_outputs, b)
-                    if m:
-                        return 'solved', ['cap_ver_hor', 'one_unique_captured'], [[[l] for l in n[0]]], None
-                    m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, 1, unique_train_outputs, b)
-                    if m:
-                        return 'solved', ['cap_diag', 'one_unique_captured'], [[l] for l in n[1]], None
-                return 'unsolved', [], [], None
+                overall_cur_invest_num_unique, overall_cur_invest_unique = self.communication.first_principles_diff_dim_signal_class(a)
+                return self.iterate_validating_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, b, a)
 
         else:
-            a, b =  self.assess_captured_target_training(self.communication.bg)
-            # we need to create outputs out of the modified objective and the b (testinputs as sets)
             is_solved = 'unsolved'
             mechanisms = []
+
+            a, b =  self.assess_captured_target_training(self.communication.bg)
             if len(b) > 0:
                 self.running_objective = a
                 objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
@@ -339,12 +345,11 @@ class Captured:
                 if all(objective_satisfiability):
                     mechanisms = self.infer_on_mechanism(b, True) # we shall trigger any direct at this point
                 elif any(objective_satisfiability):
-                    mechanisms = self.infer_on_mechanism(b, self.communication.turn_on_direct_premature) # This is a hyperparameter for mostly visualization purposes now
-
+                    mechanisms = self.infer_on_mechanism(b)
                 if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testoutputs)]):
                     is_solved = 'solved'
                 elif any(objective_satisfiability):
-                    is_solved = 'partially solved'
+                    is_solved = 'objective initiated'
                 else:
                     is_solved = 'unsolved'
 

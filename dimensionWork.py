@@ -94,7 +94,7 @@ class DimensionWork:
                     if test_evaluated:
                         return 'solved', ['is_exp_cont', self.in_mult_fact[0]], cur_preds
                     else:
-                        return 'partially solved', ['is_exp_cont', self.in_mult_fact[0]], self.cur_test_preds
+                        return 'objective initiated', ['is_exp_cont', self.in_mult_fact[0]], self.cur_test_preds
 
             elif not self.is_sim_out_shapes and self.is_sim_internal_int_div:
                 candidate_factors = [x[0] for x in self.in_mult_fact]
@@ -121,7 +121,7 @@ class DimensionWork:
                         if test_evaluated:
                             return 'solved', ['is_exp_cont_freq_unique_nonbg', candidate_factors], cur_preds
                         else:
-                            return 'partially solved', ['is_exp_cont_freq_unique_nonbg', candidate_factors], self.cur_test_preds
+                            return 'objective initiated', ['is_exp_cont_freq_unique_nonbg', candidate_factors], self.cur_test_preds
 
         return 'unsolved', [], self.cur_test_preds
 
@@ -142,6 +142,6 @@ class DimensionWork:
             if test_evaluated:
                 return 'solved', [(are_flips[0][0], are_flips[0][1])], cur_preds
             elif not test_evaluated:
-                return 'partially solved', [(are_flips[0][0], are_flips[0][1])], self.cur_test_preds
+                return 'objective initiated', [(are_flips[0][0], are_flips[0][1])], self.cur_test_preds
         else:
             return 'unsolved', [], self.cur_test_preds

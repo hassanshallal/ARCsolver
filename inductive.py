@@ -15,6 +15,11 @@ class Inductive:
 
         # cognify and analyze dimensions using dimensionWork
         self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
+        self.dimension_status, self.output_dim_preds = self.dimensionWork.get_dimension_cognified()
+
+        # We need to pass dimension_status, output_dim_preds to other modules
+        self.communication.carry_along_kwargs(dimension_status = self.dimension_status, output_dim_preds = self.output_dim_preds)
+
         self.captured = Captured(self.communication, self.running_objective, self.cur_test_preds)
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path

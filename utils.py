@@ -356,9 +356,9 @@ def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_n
     col_to_token[bg] = 'bg'
 
     for key in pr_tokens.keys():
-            col_to_token[key] = pr_tokens[key]
-            if key in final_test_nonbg:
-                final_test_nonbg.remove(key)
+        col_to_token[key] = pr_tokens[key]
+        if key in final_test_nonbg:
+            final_test_nonbg.remove(key)
 
     if len(size_sorted_nonbg) > 0:
         size_sorted_vals = get_size_sorted_nonbg_vals_test(final_test_nonbg, testinput)
@@ -435,17 +435,14 @@ def retokenize(x, token_to_colors):
         return ['Issue with retokenization.']
 
 def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_):
-     # specificaaly pick indices and tuples by category: int_anchor, token_anchor, difference
+    # specificaaly pick indices and tuples by category: int_anchor, token_anchor, difference
     int_anchors_indices = [i for i, val in enumerate(problem_graph) if val[0] not in token_to_colors.keys()]
     int_anchors = [problem_graph[x] for x in int_anchors_indices]
-
     token_anchors_indices = [i for i, val in enumerate(problem_graph) if val[0] == val[1] and type(val[0]) == str]
     token_anchors = [problem_graph[x] for x in token_anchors_indices]
 
     differences_indices = [i for i, val in enumerate(problem_graph) if val[0] != val[1] and type(val[0]) == str]
     differences = [problem_graph[x] for x in differences_indices]
-
-    # set generation with cooridinates in all couples
     assignments_leads = sorted(list(set([x[0] for x in differences])))
     num_assignemnts  = len(assignments_leads)
     asssignments_output = []
@@ -460,8 +457,6 @@ def generate_set_assignemtns_per_graph(problem_graph, token_to_colors, in_, out_
         for x in token_anchors:
             if x[0] == assignments_leads[n]:
                 this_assignemnt[('token_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
-            #elif x[0] != assignments_leads[n]:
-                #this_assignemnt[('token_nonanchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
         for x in differences:
             if x[0] == assignments_leads[n]:
                 this_assignemnt[('diff_anchor', x)] = get_coordinates_of_tuple(retokenize(x, token_to_colors), in_, out_)
