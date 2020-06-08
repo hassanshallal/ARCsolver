@@ -29,7 +29,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
         # prepare relevant info for your tests conditionally on presence of testoutputs
         self.traininputs_bg = [get_background(n) for n in self.traininputs]
         self.testinputs_bg = [get_background(n) for n in self.testinputs]
-
         # assess bg and apply deductive routines to the task
         self.global_bg, self.bg = self.assess_bg_situation()
         self.deductive_coder0, self.deductive_coder1 = self.expose_deductive()
@@ -42,10 +41,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
 
-        # Important for decision making
-        self.is_unique_output = self.find_unique_output()
-
-
         # problem description
         self.problem_graph = self.express_problem_graph()
         self.assignments_leads, self.int_anchor_vals, self.asssignments_output = self.generate_set_assignemtns()
@@ -55,18 +50,13 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.size_sorted_nonbg = self.get_size_sorted_nonbg()
         self.test_token_to_color = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
 
-        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.is_unique_output, self.testoutputs)
+        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.testoutputs)
+
         # induction
         self.inductive = Inductive(self.communication)
         self.inductive.inductive_strategy()
 
     # Methods
-    def find_unique_output(self):
-        unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
-        is_unique_train_outputs = [len(x) == 1 for x in unique_train_outputs]
-        if all(is_unique_train_outputs):
-            return [x[0] for x in unique_train_outputs]
-        return None
 
     def assess_bg_situation(self):
         traininputs_bg_set = set(self.traininputs_bg)
@@ -99,22 +89,12 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
     # This method tokenize a task based on training, it provides color_to_token, token_to_color, and problem_statements
     def tokenize(self):
-        if self.is_similar_dim and self.global_bg: #self.tokenizer_class == 'C':
-            color_to_tokens = [get_col_to_token_class_C(x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for x, y, z in zip(self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
-            token_to_colors = [get_token_to_color_class_C(x) for x in color_to_tokens]
-            problem_statements = [get_problem_statement_class_C(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
-
-            same_color_to_token = all(x == color_to_tokens[0] for x in color_to_tokens)
-            #same_problem_statement = all(x == problem_statements[0] for x in problem_statements)
-
-            if same_color_to_token:
-                #print('Found ONE code: ')
-                return color_to_tokens, token_to_colors, problem_statements
-            else:
-                #print('Found MULTIPLE codes: ')
-                return color_to_tokens, token_to_colors, problem_statements
+        if self.is_similar_dim:
+            color_to_tokens = [get_col_to_token(x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for x, y, z in zip(self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
+            token_to_colors = [get_token_to_color(x) for x in color_to_tokens]
+            problem_statements = [get_problem_statement(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
+            return color_to_tokens, token_to_colors, problem_statements
         else:
-            #print('coming soon in a different taste!')
             return {}, {}, []
 
     # steps to generate an objective from problem_statements (problem_statement --> problem_graph --> objective )
@@ -139,8 +119,11 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 copy_problem_graph.append(tuple(sorted([y for y in n if type(y[0]) == str])))
 
             copy_problem_graph = sorted(list(set(copy_problem_graph)), key = len)
-            if len(copy_problem_graph) == 1:
+            if len(copy_problem_graph) == 1 and self.global_bg:
                 return get_this_objective(copy_problem_graph[0]), 'obd' # one by default
+            elif len(copy_problem_graph) == 1 and not self.global_bg:
+                return [list(x) for x in copy_problem_graph], 'obd'
+
             elif len(copy_problem_graph) > 1:
                 current_boss = set()
                 for n in range(len(copy_problem_graph)-1):
@@ -220,6 +203,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
                     modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1])
                     modified_combs = [x[0] for x in modified_combs]
         return modified_combs
+
     def get_test_token_to_color(self):
         if len(self.token_to_colors) > 0:
             if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
@@ -228,8 +212,8 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 pr_tokens = get_priority_token(self.token_to_colors)
                 testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
                 final_test_nonbg = sorted(list(get_common_nonbg_inputs(testinputs_vals)))
-                test_color_to_token = get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
-                return get_token_to_color_class_C(test_color_to_token)
+                test_color_to_token = get_col_to_token_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
+                return get_token_to_color(test_color_to_token)
 
     # simple print utilities
     def brief_task(self):

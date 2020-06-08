@@ -1,5 +1,7 @@
 import os
 import pickle
+from types import FunctionType
+from inspect import getmembers
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -26,6 +28,13 @@ def load_serialized(name):
     object_ = pickle.load(file)
     file.close()
     return object_
+
+# The following two functions to show all attributes of an object
+def api(obj):
+    return [name for name in dir(obj) if name[0] != '_']
+def attrs(obj):
+     disallowed_properties = { name for name, value in getmembers(type(obj))  if isinstance(value, (property, FunctionType))}
+     return {name: getattr(obj, name) for name in api(obj) if name not in disallowed_properties and hasattr(obj, name)}
 
 # load set
 def load_set(path):
@@ -308,18 +317,30 @@ def get_common_nonbg_inputs(traininputs_vals):
     #     s &= set(e)
     return reduce((lambda x,y: x & y), map(set, traininputs_vals)) #s
 
-def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg, priority_nonbg):
-    priority_nonbg_list = sorted(list(set([x for x in priority_nonbg if x != bg])))
-    in_val_list = [x for x in in_val_list if x != bg]
-    out_val_list = [x for x in out_val_list if x != bg]
-    in_val_nonbg_set = sorted(list(set(in_val_list)))
-    out_val_nonbg_set = sorted(list(set(out_val_list)))
+def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testinput):
+    modified_combs = set()
+    for n in remaining_test_nonbg:
+        modified_combs.add((n, np.count_nonzero(testinput == n)))
+    modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1])
+    modified_combs = [x[0] for x in modified_combs]
+    return modified_combs
 
-    nonbg_target_val_set = get_target_values(couple_val_map)
-
-    # get your vol_to_token and token_to_col
+def get_col_to_token(in_val_list, out_val_list, couple_val_map, bg, priority_nonbg):
     col_to_token = {}
-    col_to_token[bg] = 'bg'
+    if type(bg) == int:
+        priority_nonbg_list = sorted(list(set([x for x in priority_nonbg if x != bg])))
+        in_val_list = [x for x in in_val_list if x != bg]
+        out_val_list = [x for x in out_val_list if x != bg]
+        in_val_nonbg_set = sorted(list(set(in_val_list)))
+        out_val_nonbg_set = sorted(list(set(out_val_list)))
+        nonbg_target_val_set = get_target_values(couple_val_map)
+        col_to_token[bg] = 'bg'
+
+    elif type(bg) == list:
+        priority_nonbg_list = sorted(priority_nonbg)
+        in_val_nonbg_set = sorted(list(set(in_val_list)))
+        out_val_nonbg_set = sorted(list(set(out_val_list)))
+        nonbg_target_val_set = get_target_values(couple_val_map)
 
     for n in range(len(priority_nonbg_list)):
         if priority_nonbg_list[n] not in col_to_token.keys() and (priority_nonbg_list[n] in nonbg_target_val_set or priority_nonbg_list[n] in couple_val_map.keys()): #we are focusing on what changes
@@ -338,22 +359,18 @@ def get_col_to_token_class_C(in_val_list, out_val_list, couple_val_map, bg, prio
 
     return col_to_token
 
-def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testinput):
-    modified_combs = set()
-    for n in remaining_test_nonbg:
-        modified_combs.add((n, np.count_nonzero(testinput == n)))
-    modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1])
-    modified_combs = [x[0] for x in modified_combs]
-    return modified_combs
-
-def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, int_anchor_vals, testinput):
+def get_col_to_token_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, int_anchor_vals, testinput):
     int_anchor_vals = [x for x in int_anchor_vals if len(x) > 0]
     if len(int_anchor_vals) > 0:
         int_anchor_vals = list(reduce((lambda z,y: z & y), map(set, int_anchor_vals)))
 
-    final_test_nonbg = [x for x in final_test_nonbg if x != bg and x not in int_anchor_vals]
     col_to_token = {}
-    col_to_token[bg] = 'bg'
+
+    if type(bg) == int:
+        final_test_nonbg = [x for x in final_test_nonbg if x != bg and x not in int_anchor_vals]
+        col_to_token[bg] = 'bg'
+    elif type(bg) == list:
+        final_test_nonbg = [x for x in final_test_nonbg if x not in int_anchor_vals]
 
     for key in pr_tokens.keys():
         col_to_token[key] = pr_tokens[key]
@@ -373,10 +390,10 @@ def get_col_to_token_class_c_test(final_test_nonbg, pr_tokens, bg, size_sorted_n
 
     return col_to_token
 
-def get_token_to_color_class_C(col_to_token):
+def get_token_to_color(col_to_token):
     return {v: k for k, v in col_to_token.items()}
 
-def get_problem_statement_class_C(col_to_token, couple_value_map):
+def get_problem_statement(col_to_token, couple_value_map):
     problem_statement = []
     for k, v in couple_value_map.items():
         value_list = sorted(list(v))
@@ -425,6 +442,18 @@ def get_coordinates_of_tuple(x, in_, out_):
         return coordinates
     else:
         target_indices = np.argwhere((in_ == x[0]) & (out_ == x[1]))
+        return [target_indices]
+
+def get_coordinates_from_test(x, in_):
+    if type(in_) == list:
+        coordinates = []
+        for n in range(len(in_)):
+            this_in_ = in_[n]
+            target_indices = np.argwhere(this_in_ == x[0])
+            coordinates.append(target_indices)
+        return coordinates
+    else:
+        target_indices = np.argwhere(in_ == x[0])
         return [target_indices]
 
 def retokenize(x, token_to_colors):
@@ -486,6 +515,22 @@ def get_this_objective(cur_graph):
         leveraged.add(n[1])
     combs = [[x] for x in cur_graph if x not in leveraged and x[0] != x[1]] + combs
     return combs
+
+def create_an_objective_dict(objective):
+    objective_dict = {}
+    for n in range(len(objective)):
+        this_objective = objective[n]
+        for x in this_objective:
+            if type(x) == tuple:
+                objective_dict[x[0]] = x[1]
+    return objective_dict
+
+def retokenize_objective_dict(objective_dict, test_token_to_color):
+    retokenized = {}
+    for k, v in objective_dict.items():
+        retokenized[test_token_to_color[k]] = test_token_to_color[v]
+    return retokenized
+
 
 def get_priority_token(token_to_colors):
     pr_tokens = {}
@@ -572,6 +617,16 @@ def retrieve_coords_from_assignments(target_tuple, asssignments_output):
                 if target_tuple == k[1]:
                     results.append(v[0])
     return results
+
+def retrieve_coords_nonbg_from_arr(nonbg, arr):
+    results = []
+    for n in range(arr.shape[0]): # len num_train
+        for x in range(arr.shape[1]): # assignment
+            if arr[n][x] == nonbg:
+                results.append((n, x))
+
+    return results
+
 # The following examine simple matrix rotations and mirroring
 def get_diagonal_mirror(arr):
     arr = fix_dim(arr)

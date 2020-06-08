@@ -3,6 +3,7 @@ from communicate import *
 
 from dimensionWork import *
 from captured import *
+from cages import *
 
 class Inductive:
     def __init__(self, communication):
@@ -20,6 +21,7 @@ class Inductive:
         # We need to pass dimension_status, output_dim_preds to other modules
         self.communication.carry_along_kwargs(dimension_status = self.dimension_status, output_dim_preds = self.output_dim_preds)
 
+        self.cages = Cages(self.communication, self.running_objective)
         self.captured = Captured(self.communication, self.running_objective, self.cur_test_preds)
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
@@ -36,10 +38,20 @@ class Inductive:
             self.cur_test_preds = this_testpred
             return
 
+        # go cages: after everything ot otherwise it will screw up
+        self.solved, self.mechanisms, this_testpred, self.running_objective = self.cages.screen_cages()
+        if self.solved == 'solved':
+            self.cur_test_preds = this_testpred
+            return
+
         # try captured related, we will pass and recieve a modified running objective or none
         self.solved, self.mechanisms,  this_test_pred, self.running_objective = self.captured.screen_captured()
         if self.solved == 'solved' or self.solved == 'partially solved':
             self.cur_test_preds = this_test_pred
             return
+
+
+
+
 
         return

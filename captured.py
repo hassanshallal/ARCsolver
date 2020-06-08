@@ -256,7 +256,7 @@ class Captured:
         for x in [2, 0, 1]:
             m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, x, self.communication.is_unique_output, b)
             if m:
-                this_output = [self.communication.unobjectively_build_a_prediction(self.communication.dimension_status, k, one_unique_captured = l) for k, l in zip(self.communication.output_dim_preds, n[x])]
+                this_output = [self.communication.build_a_prediction(self.communication.dimension_status, k, add_to_zero = l) for k, l in zip(self.communication.output_dim_preds, n[x])]
                 if x == 2:
                     return 'solved', ['cap_all', 'one_unique_captured'], this_output, None
                 elif x == 0:
@@ -336,22 +336,22 @@ class Captured:
         else:
             is_solved = 'unsolved'
             mechanisms = []
+            if type(self.communication.bg) == int:
+                a, b =  self.assess_captured_target_training(self.communication.bg)
+                if len(b) > 0: # this condition may not be enough
+                    self.running_objective = a
+                    objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
 
-            a, b =  self.assess_captured_target_training(self.communication.bg)
-            if len(b) > 0:
-                self.running_objective = a
-                objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
-
-                if all(objective_satisfiability):
-                    mechanisms = self.infer_on_mechanism(b, True) # we shall trigger any direct at this point
-                elif any(objective_satisfiability):
-                    mechanisms = self.infer_on_mechanism(b)
-                if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testoutputs)]):
-                    is_solved = 'solved'
-                elif any(objective_satisfiability):
-                    is_solved = 'objective initiated'
-                else:
-                    is_solved = 'unsolved'
+                    if all(objective_satisfiability):
+                        mechanisms = self.infer_on_mechanism(b, True) # we shall trigger any direct at this point
+                    elif any(objective_satisfiability):
+                        mechanisms = self.infer_on_mechanism(b)
+                    if all([np.array_equal(x, y) for x, y in zip(self.cur_test_preds, self.communication.testoutputs)]):
+                        is_solved = 'solved'
+                    elif any(objective_satisfiability):
+                        is_solved = 'objective initiated'
+                    else:
+                        is_solved = 'unsolved'
 
             return is_solved, mechanisms, self.cur_test_preds, self.running_objective
 

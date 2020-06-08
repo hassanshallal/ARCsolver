@@ -25,6 +25,12 @@ class DimensionWork:
         self.is_sim_int_div = all([x == self.in_mult_fact[0] for x in self.in_mult_fact])
         self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.in_mult_fact])
 
+        self.is_one_row_output = all([x[0] == 1 and x[1] >= 1 for x in self.trainoutputs_shapes])
+        self.row_dim_ouputs = [x[0] for x in self.trainoutputs_shapes]
+        self.is_one_column_output = all([x[1] == 1 and x[0] >= 1 for x in self.trainoutputs_shapes])
+        self.col_dim_ouputs = [x[1] for x in self.trainoutputs_shapes]
+
+
         self.dimension_status, self.output_dim_preds = self.cognify_dimensions()
 
     def cognify_dimensions(self):
@@ -37,13 +43,16 @@ class DimensionWork:
                     return 'deduced', [tuple(x) for x in modify_dimensiosn(self.testinput_shapes, self.in_mult_fact[0])]
                 elif self.unidirctional and not self.is_sim_int_div:
                     if self.is_sim_out_shapes:
-                        return 'deduced', [tuple(self.trainoutputs_shapes[0])] * len(self.communication.
-
-
-                        testinputs)
+                        return 'deduced', [tuple(self.trainoutputs_shapes[0])] * len(self.communication.testinputs)
                     else:
                         if self.is_sim_internal_int_div:
                             return 'partially deduced', [tuple(x) for x in self.testinput_shapes]
+
+            if self.is_one_row_output and self.col_dim_ouputs == self.communication.freq_nonbg_traininputs:
+                return 'deduced', [(1, x) for x in self.communication.freq_nonbg_testinputs]
+            if self.is_one_column_output and self.row_dim_ouputs == self.communication.freq_nonbg_traininputs:
+                return 'deduced', [(x, 1) for x in self.communication.freq_nonbg_testinputs]
+
         return 'undeduced', [tuple(x) for x in self.testinput_shapes]
 
     def get_dimension_cognified(self):

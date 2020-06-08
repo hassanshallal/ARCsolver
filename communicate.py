@@ -2,7 +2,7 @@
 from utils import *
 
 class Communication:
-    def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, is_unique_output, testoutputs = None):
+    def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testinputs_vals, testoutputs = None):
         self.traininputs = traininputs
         self.trainoutputs = trainoutputs
         self.testinputs = testinputs
@@ -14,14 +14,29 @@ class Communication:
         self.asssignments_output = asssignments_output
         self.token_to_colors = token_to_colors
         self.test_token_to_color = test_token_to_color
-        self.is_unique_output = is_unique_output
+        self.testinputs_vals = testinputs_vals
         self.testoutputs = testoutputs
 
         # The following data members are added along the way and used by other modules
-        # The following two data members will be updated with the dimensionWORK
-
+        self.is_unique_output = self.find_unique_output()
+        self.freq_nonbg_traininputs = self.get_freq_nonbg_inputs(self.traininputs)
+        self.freq_nonbg_testinputs = self.get_freq_nonbg_inputs(self.testinputs)
         # Hyperparameters for inductive or any of its modules can be passed here
         # self.turn_on_direct_premature = False
+
+    def find_unique_output(self):
+        unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
+        is_unique_train_outputs = [len(x) == 1 for x in unique_train_outputs]
+        if all(is_unique_train_outputs):
+            return [x[0] for x in unique_train_outputs]
+        return None
+
+    def get_freq_nonbg_inputs(self, lists):
+        if type(self.bg) == int:
+            return [np.sum(x != self.bg) for x in lists]
+        elif type(self.bg) == list:
+            return [np.sum(x != y) for x, y in zip(lists, self.bg)]
+
     def first_principles_diff_dim_checks(self, *args):
         for n in args:
             ext_len = len(n)
@@ -76,9 +91,11 @@ class Communication:
             del test_token_to_color['bg']
 
         if len(test_token_to_color) > len(current_objective):
-            diff = set(test_token_to_color.keys()) - get_bare_assignment_leads(assignments_leads)
-            for n in list(diff):
-                current_objective.append(expand_obj(deepcopy(current_objective[0]), n))
+            diff = list(set(test_token_to_color.keys()) - get_bare_assignment_leads(assignments_leads))
+            for n in diff:
+                if self.test_token_to_color[n] in self.testinputs_vals[0]:
+                    this_extra = expand_obj(deepcopy(current_objective[0]), n)
+                    current_objective.append(this_extra)
             return current_objective
 
         if len(test_token_to_color) < len(current_objective):
@@ -118,6 +135,7 @@ class Communication:
                     cur_test_pred[n][coord[0]][coord[1]] = self.test_token_to_color[change_tuple[1]]
         return cur_test_pred
 
+    # this method direct transform without reference to coordinates
     def apply_direct_transformation(self, change_tuple, cur_test_pred):
         for x in range(len(cur_test_pred)):
             for n in range(cur_test_pred[x].shape[0]):
@@ -128,14 +146,21 @@ class Communication:
         return cur_test_pred
 
     # Creating and populating output in cases with no objective:
-    def unobjectively_build_a_prediction(self, dimension_status, output_dim_preds, **kwargs):
+    def build_a_prediction(self, dimension_status, reference, **kwargs):
         if dimension_status == 'deduced':
-            cur_output = np.zeros(output_dim_preds)
             for k, v in kwargs.items():
-                if k == 'one_unique_captured':
+                if k == 'add_to_zero':
+                    cur_output = np.zeros(reference) # reference is dimensions
                     cur_output += v
                     cur_output = cur_output.astype(int)
-                return [y.tolist() for y in cur_output]
+                    return [y.tolist() for y in cur_output]
+                elif k == 'direct_transform':
+                    cur_output = reference # reference is a testinput array
+                    this_objective_dict = create_an_objective_dict(self.objective)
+                    for token, coords in v.items():
+                        for coord in coords:
+                            cur_output[coord[0], coord[1]] = self.test_token_to_color[this_objective_dict[token]]
+                    return [y.tolist() for y in cur_output]
         return None
 
     # Transfer cargo
