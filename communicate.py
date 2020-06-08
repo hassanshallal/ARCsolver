@@ -93,7 +93,7 @@ class Communication:
         if len(test_token_to_color) > len(current_objective):
             diff = list(set(test_token_to_color.keys()) - get_bare_assignment_leads(assignments_leads))
             for n in diff:
-                if self.test_token_to_color[n] in self.testinputs_vals[0]:
+                if self.test_token_to_color[n] in list(itertools.chain.from_iterable(self.testinputs_vals)):
                     this_extra = expand_obj(deepcopy(current_objective[0]), n)
                     current_objective.append(this_extra)
             return current_objective
