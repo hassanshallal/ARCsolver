@@ -22,7 +22,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
 
         self.couple_val_map = [get_value_map(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
+        #print('self.couple_val_map: ', self.couple_val_map)
         self.global_value_map = get_global_value_map(self.couple_val_map)
+        #print('self.global_value_map', self.global_value_map)
         self.couple_similars = [get_similars(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
         self.global_similars = get_global_value_map(self.couple_similars)
 
@@ -34,10 +36,29 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.deductive_coder0, self.deductive_coder1 = self.expose_deductive()
 
         # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
-        self.priority_nonbg_all_input = sorted(list(get_common_nonbg_inputs(self.traininputs_vals)))
-        self.priority_nonbg_all_output = sorted(list(get_common_nonbg_inputs(self.trainoutputs_vals)))
-        self.priority_nonbg_input = list(set(self.priority_nonbg_all_input) - set(self.priority_nonbg_all_output))
-        self.priority_nonbg_output = list(set(self.priority_nonbg_all_output) - set(self.priority_nonbg_all_input))
+        # we need to get prior colors only in train inputs and test input not in outputs or
+        # in train output but not
+
+        all_test_input_vals = list(itertools.chain.from_iterable(self.testinputs_vals))
+        #print('all_test_input_vals: ', all_test_input_vals)
+        self.priority_nonbg_input = sorted(list(get_common_nonbg(self.traininputs_vals)))
+        #print('self.priority_nonbg_input before: ', self.priority_nonbg_input )
+        self.priority_nonbg_input = [x for x in self.priority_nonbg_input if x in all_test_input_vals and x in self.global_value_map.keys()]
+        #print('self.priority_nonbg_input after: ', self.priority_nonbg_input )
+
+        self.priority_nonbg_output = sorted(list(get_common_nonbg(self.trainoutputs_vals)))
+        #print('self.priority_nonbg_output before: ', self.priority_nonbg_output)
+        list_global_value_map_values = list(itertools.chain.from_iterable(list(self.global_value_map.values())))
+        #print('list_global_value_map_values: ', list_global_value_map_values)
+
+        self.priority_nonbg_output = [x for x in self.priority_nonbg_output if x in list_global_value_map_values]
+        #print('self.priority_nonbg_output: ', self.priority_nonbg_output)
+
+        # self.priority_nonbg_input = list(set(self.priority_nonbg_all_input) - set(self.priority_nonbg_all_output))
+        # print('self.priority_nonbg_input: ', self.priority_nonbg_input)
+        # self.priority_nonbg_output = list(set(self.priority_nonbg_all_output) - set(self.priority_nonbg_all_input))
+        # self.priority_nonbg_output = [x for x in self.priority_nonbg_all_output if x in self.global_value_map.values()]
+        # print('self.priority_nonbg_output: ', self.priority_nonbg_output)
 
         self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
 
@@ -49,7 +70,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
         # use above to tokenize the test and have a test_token_to_color_dict
         self.size_sorted_nonbg = self.get_size_sorted_nonbg()
         self.test_token_to_color = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
-
         self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.testoutputs)
 
         # induction
@@ -90,7 +110,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
     # This method tokenize a task based on training, it provides color_to_token, token_to_color, and problem_statements
     def tokenize(self):
         if self.is_similar_dim:
-            color_to_tokens = [get_col_to_token(x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for x, y, z in zip(self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
+            color_to_tokens = [get_col_to_token(w, x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for w, x, y, z in zip(self.traininputs, self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
             token_to_colors = [get_token_to_color(x) for x in color_to_tokens]
             problem_statements = [get_problem_statement(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
             return color_to_tokens, token_to_colors, problem_statements
@@ -135,6 +155,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
                                 current_boss.add(copy_problem_graph[n+1])
                         elif len(current_boss) == 0:
                             current_boss.add(copy_problem_graph[n+1])
+                    else:
+                        current_boss = set()
+                        break
                 current_boss = list(current_boss)
                 if len(current_boss) == 0:
                     return copy_problem_graph, 'irr'# this is another level of difficulty I guess, irreducible
@@ -211,7 +234,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
             else:
                 pr_tokens = get_priority_token(self.token_to_colors)
                 testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
-                final_test_nonbg = sorted(list(get_common_nonbg_inputs(testinputs_vals)))
+                final_test_nonbg = sorted(list(get_common_nonbg(testinputs_vals)))
                 test_color_to_token = get_col_to_token_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
                 return get_token_to_color(test_color_to_token)
 

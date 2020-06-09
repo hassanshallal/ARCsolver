@@ -11,7 +11,7 @@ import itertools
 from itertools import permutations, combinations, product
 import numpy as np
 from functools import reduce
-
+import random
 
 from deductive import *
 
@@ -75,7 +75,6 @@ def get_training(raw_task):
         # prepare
         traininputs = []
         trainoutputs = []
-
         for m in range(num_train):
             this_input = fix_dim(training[m]['input'])
             this_output = fix_dim(training[m]['output'])
@@ -260,6 +259,8 @@ def get_global_value_map(list_of_value_maps):
                 for m in value:
                     global_vm[key].add(m)
 
+    for k, v in global_vm.items():
+        global_vm[k] = list(v)
     return global_vm
 
 # get cell neighbours
@@ -308,14 +309,14 @@ def get_non_bg_set_situation(in_val_list, out_val_list, bg):
     out_val_nonbg_set = set(out_val_list)
     return in_val_nonbg_set.issubset(out_val_nonbg_set)
 
-def get_common_nonbg_inputs(traininputs_vals):
+def get_common_nonbg(lists):
     # s = None
     # for e in traininputs_vals:
     # if not s:
     #     s = set(e)
     # else:
     #     s &= set(e)
-    return reduce((lambda x,y: x & y), map(set, traininputs_vals)) #s
+    return reduce((lambda x,y: x & y), map(set, lists)) #s
 
 def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testinput):
     modified_combs = set()
@@ -325,7 +326,7 @@ def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testinput):
     modified_combs = [x[0] for x in modified_combs]
     return modified_combs
 
-def get_col_to_token(in_val_list, out_val_list, couple_val_map, bg, priority_nonbg):
+def get_col_to_token(arr_, in_val_list, out_val_list, couple_val_map, bg, priority_nonbg):
     col_to_token = {}
     if type(bg) == int:
         priority_nonbg_list = sorted(list(set([x for x in priority_nonbg if x != bg])))
@@ -347,6 +348,8 @@ def get_col_to_token(in_val_list, out_val_list, couple_val_map, bg, priority_non
             cur_len = len(col_to_token)
             col_to_token[priority_nonbg_list[n]] = 'nonbg' + str(cur_len-1) + 'pr'
 
+    # Arrange your nonbg labelling based on size
+    in_val_nonbg_set = sort_nonbg_by_size_in_arr(in_val_nonbg_set, arr_)
     for n in range(len(in_val_nonbg_set)):
         if in_val_nonbg_set[n] not in col_to_token.keys() and (in_val_nonbg_set[n] in nonbg_target_val_set or in_val_nonbg_set[n] in couple_val_map.keys()): #we are focusing on what changes
             cur_len = len(col_to_token)
@@ -383,6 +386,8 @@ def get_col_to_token_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, in
             if size_sorted_vals[n] not in col_to_token.keys() and n < len(size_sorted_nonbg):
                 col_to_token[size_sorted_vals[n]] = size_sorted_nonbg[n]
 
+    # arrange based on size
+    final_test_nonbg = sort_nonbg_by_size_in_arr(final_test_nonbg, testinput)
     for n in range(len(final_test_nonbg)):
         if final_test_nonbg[n] not in col_to_token.keys():
             cur_len = len(col_to_token)
@@ -444,17 +449,35 @@ def get_coordinates_of_tuple(x, in_, out_):
         target_indices = np.argwhere((in_ == x[0]) & (out_ == x[1]))
         return [target_indices]
 
-def get_coordinates_from_test(x, in_):
+def get_coordinates_from_arr(x, in_):
     if type(in_) == list:
         coordinates = []
         for n in range(len(in_)):
             this_in_ = in_[n]
-            target_indices = np.argwhere(this_in_ == x[0])
+            target_indices = np.argwhere(this_in_ == x)
             coordinates.append(target_indices)
         return coordinates
     else:
-        target_indices = np.argwhere(in_ == x[0])
-        return [target_indices]
+        target_indices = np.argwhere(in_ == x)
+        return target_indices
+
+def get_len_coordinates_from_arr(x, in_):
+    if type(in_) == list:
+        coordinates = []
+        for n in range(len(in_)):
+            this_in_ = in_[n]
+            target_indices = np.argwhere(this_in_ == x)
+            coordinates.append([target_indices])
+        return [len(x) for x in coordinates]
+    else:
+        target_indices = np.argwhere(in_ == x)
+        return len(target_indices)
+
+def sort_nonbg_by_size_in_arr(nonbg_list, arr_):
+    results = [get_len_coordinates_from_arr(x, arr_) for x in nonbg_list]
+    created_tuple = [(x, y) for x, y in zip(nonbg_list, results)]
+    created_tuple = sorted(created_tuple, key=lambda tup: tup[1])
+    return [x[0] for x in created_tuple]
 
 def retokenize(x, token_to_colors):
     if x[0] in token_to_colors.keys() and x[1] in token_to_colors.keys():
@@ -530,7 +553,6 @@ def retokenize_objective_dict(objective_dict, test_token_to_color):
     for k, v in objective_dict.items():
         retokenized[test_token_to_color[k]] = test_token_to_color[v]
     return retokenized
-
 
 def get_priority_token(token_to_colors):
     pr_tokens = {}
@@ -641,17 +663,17 @@ def screen_flips_rotation(in_, out_):
     in_ = fix_dim(in_)
     out_ = fix_dim(out_)
 
-    # rotation is more precedent over flipud or fliplr
-    if np.all(np.rot90(in_, 1, axes = (0, 1)) == out_):
+    # get_diagonal_mirror is more precedent than rotation which is more precedent over flipud or fliplr
+    if np.all(get_diagonal_mirror(in_) == out_):
+        return get_diagonal_mirror, None
+    elif np.all(get_offdiagonal_mirror(in_) == out_):
+        return get_offdiagonal_mirror, None
+    elif np.all(np.rot90(in_, 1, axes = (0, 1)) == out_):
         return np.rot90, 1
     elif np.all(np.rot90(in_, 2, axes = (0, 1)) == out_):
         return np.rot90, 2
     elif np.all(np.rot90(in_, 3, axes = (0, 1)) == out_):
         return np.rot90, 3
-    elif np.all(get_diagonal_mirror(in_) == out_):
-        return get_diagonal_mirror, None
-    elif np.all(get_offdiagonal_mirror(in_) == out_):
-        return get_offdiagonal_mirror, None
     elif np.all(np.flipud(in_) == out_):
         return np.flipud, None
     elif np.all(np.fliplr(in_) == np.array(out_)):

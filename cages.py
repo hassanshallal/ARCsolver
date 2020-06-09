@@ -11,11 +11,21 @@ class Cages:
 
     def check_objective_against_direct(self):
         copy_objective = deepcopy(self.running_objective)
-        for n in range(len(copy_objective[0])):
-            copy_objective[0][n] = (copy_objective[0][n][0], copy_objective[0][n][1], 'direct')
-        return copy_objective[0]
+        for n in range(len(copy_objective)):
+            this_check = copy_objective[n]
+            if len(this_check) == 1:
+                copy_objective[n] = [this_check[0][0], this_check[0][1], 'direct']
+            elif len(this_check) == 2:
+                if this_check[0][0] != this_check[1][0]:
+                    copy_objective[n][0] = [this_check[0][0], this_check[0][1], 'direct']
+                    copy_objective[n][1] = [this_check[1][0], this_check[1][1], 'direct']
+        if is_list_of_list_of_list(copy_objective):
+            return copy_objective[0]
+        return copy_objective
 
     def retrieve_coords_of_assignemnt_leads(self):
+        # print(self.communication.assignments_leads)
+        # print(self.communication.test_token_to_color)
         coords = []
         ass_leads = list(get_bare_assignment_leads(self.communication.assignments_leads))
         ass_leads_retokenized = [self.communication.test_token_to_color[x] for x in ass_leads]
@@ -43,6 +53,10 @@ class Cages:
         mechanisms = []
         a, b =  self.assess_direct()
         if len(b) > 0:
+            # this next feedback mechanism will need to be better for cases 202
+            if self.communication.objective_status == 'red':
+                # In case of 'obd' cases, the test expectation is not ready to handle unsatisfiable objectives
+                a = self.communication.set_test_expectations(a)
             self.running_objective = a
             objective_satisfiability = [len(x) == 3 for x in a]
             if all(objective_satisfiability):
@@ -64,11 +78,12 @@ class Cages:
 
             # output is the only nonbg in the input: 338
             elif self.communication.is_unique_output != None and all([sum([y != self.communication.bg  for y in np.unique(x).tolist()]) == 1 for x in self.communication.traininputs]):
+                print('hello from here')
                 test_nonbg = [np.unique(x).tolist()[1] for x in self.communication.testinputs]
                 this_output = [self.communication.build_a_prediction(self.communication.dimension_status, k, add_to_zero = l) for k, l in zip(self.communication.output_dim_preds, test_nonbg)]
                 return 'solved', ['cages', 'output_is_one_nonbg'], this_output, self.running_objective
-
-            elif self.communication.objective_status == 'obd' and type(self.communication.bg) != int:
+            # the next is direct transformation on tasks with no single bg and with known expected dimension: last in row
+            elif type(self.communication.bg) != int and self.communication.objective_status != 'irr':
                 is_solved, mechanisms, this_output, this_running_objective = self.screen_direct_trnsformations()
                 if is_solved == 'solved':
                     return is_solved, mechanisms, this_output, this_running_objective
