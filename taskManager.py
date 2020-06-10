@@ -1,12 +1,59 @@
 # Be subtle and abstract
-# lists are the container we will use to handle different couples, etc
 from utils import *
 from communicate import *
 from inductive import *
 
+def flip_test_train(task, num):
+    modified_task = deepcopy(task)
+    temp = deepcopy(modified_task['train'][num])
+    test = deepcopy(modified_task['test'])[0]
+    modified_task['train'][num] = test
+    modified_task['test'][0] = temp
+    return modified_task
+
+def confirmer(task):
+    training = task['train']
+    num_train = len(training)
+    scope = []
+    scope.append(TaskManager(task).inductive.solved)
+    for n in range(num_train):
+        modified_task = flip_test_train(task, n)
+        scope.append(TaskManager(modified_task).inductive.solved)
+    return all([x == 'solved' for x in scope])
+
+# forced_bg is used in reconfirmation on unconfirmed cases as a backup way to confirm we got the right thing
+# This is the first time we design in a human way, this is how the system actually can manage some ambiguity
+# both tasks [293, 338] failed initial reconfirmation and when we forced a bg of 0, we managed to get them to be
+# reconfirmed, we made changes in the cages that don't work with the on-th-fly data in communication, this is a trap
+# and we should probably solve it.
+
+# With this development, we we able to solve the reconfirmation problem in a human manner. The system is
+# quite sensitive to the bg and we need to figure out whether we should probably take the bg in the test
+# in consideration and do some consensus when we have a list bg with a mode or something. We scored only two
+# on the evaluaton but it is interesting we initiated like 48 task, very nice.
+
+def explain_unconfirmed(task, forced_bg = None):
+    reference_task = TaskManager(task)
+
+    training = task['train']
+    num_train = len(training)
+    scope = []
+    scope.append(TaskManager(task).inductive.solved)
+    for n in range(num_train):
+        modified_task = flip_test_train(task, n)
+        this_task = TaskManager(modified_task, forced_bg)
+        print('bg: ', this_task.bg)
+        print('token_to_colors: ', this_task.token_to_colors)
+        print('test_token_to_color: ', this_task.test_token_to_color)
+        print('objective: ', this_task.objective)
+        print('running objective: ', this_task.inductive.running_objective)
+        plot_task_eval(modified_task, this_task.inductive.cur_test_preds)
+        scope.append(this_task.inductive.solved)
+    return scope
+
 class TaskManager: # works on a task by task level, there are checks and balances
     # initiation defines several data members and uses class methods so as to output a problem graph
-    def __init__(self, raw_task):
+    def __init__(self, raw_task, forced_bg = None):
         self.raw_task = raw_task
         self.num_train = len(raw_task['train'])
         self.num_test = len(raw_task['test'])
@@ -33,32 +80,21 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.testinputs_bg = [get_background(n) for n in self.testinputs]
         # assess bg and apply deductive routines to the task
         self.global_bg, self.bg = self.assess_bg_situation()
+        if forced_bg != None:
+            self.global_bg = True
+            self.bg = forced_bg
+
         self.deductive_coder0, self.deductive_coder1 = self.expose_deductive()
 
         # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
-        # we need to get prior colors only in train inputs and test input not in outputs or
-        # in train output but not
 
         all_test_input_vals = list(itertools.chain.from_iterable(self.testinputs_vals))
-        #print('all_test_input_vals: ', all_test_input_vals)
         self.priority_nonbg_input = sorted(list(get_common_nonbg(self.traininputs_vals)))
-        #print('self.priority_nonbg_input before: ', self.priority_nonbg_input )
         self.priority_nonbg_input = [x for x in self.priority_nonbg_input if x in all_test_input_vals and x in self.global_value_map.keys()]
-        #print('self.priority_nonbg_input after: ', self.priority_nonbg_input )
 
         self.priority_nonbg_output = sorted(list(get_common_nonbg(self.trainoutputs_vals)))
-        #print('self.priority_nonbg_output before: ', self.priority_nonbg_output)
         list_global_value_map_values = list(itertools.chain.from_iterable(list(self.global_value_map.values())))
-        #print('list_global_value_map_values: ', list_global_value_map_values)
-
         self.priority_nonbg_output = [x for x in self.priority_nonbg_output if x in list_global_value_map_values]
-        #print('self.priority_nonbg_output: ', self.priority_nonbg_output)
-
-        # self.priority_nonbg_input = list(set(self.priority_nonbg_all_input) - set(self.priority_nonbg_all_output))
-        # print('self.priority_nonbg_input: ', self.priority_nonbg_input)
-        # self.priority_nonbg_output = list(set(self.priority_nonbg_all_output) - set(self.priority_nonbg_all_input))
-        # self.priority_nonbg_output = [x for x in self.priority_nonbg_all_output if x in self.global_value_map.values()]
-        # print('self.priority_nonbg_output: ', self.priority_nonbg_output)
 
         self.color_to_tokens, self.token_to_colors, self.problem_statements =  self.tokenize()
 
@@ -237,20 +273,3 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 final_test_nonbg = sorted(list(get_common_nonbg(testinputs_vals)))
                 test_color_to_token = get_col_to_token_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
                 return get_token_to_color(test_color_to_token)
-
-    # simple print utilities
-    def brief_task(self):
-        # if type(self.asssignments_output[0]) == list:
-        #     for m in range(len(self.asssignments_output)):
-        #         for n in self.asssignments_output[m]:
-        #             for k, v in n.items():
-        #                 print(k, ' : ', str([len(l) for l in v]))
-        #             print("end of assignment.")
-        #         print("end of an option :).")
-        # print(self.traininputs)
-        # print(self.objective)
-        # print(self.objective_status)
-        # print(self.solved)
-        # print(self.mechanisms)
-        #print(self.testpreds)
-        print("=========")

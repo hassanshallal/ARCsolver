@@ -29,8 +29,7 @@ class DimensionWork:
         self.row_dim_ouputs = [x[0] for x in self.trainoutputs_shapes]
         self.is_one_column_output = all([x[1] == 1 and x[0] >= 1 for x in self.trainoutputs_shapes])
         self.col_dim_ouputs = [x[1] for x in self.trainoutputs_shapes]
-
-
+        
         self.dimension_status, self.output_dim_preds = self.cognify_dimensions()
 
     def cognify_dimensions(self):

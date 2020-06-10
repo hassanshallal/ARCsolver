@@ -9,6 +9,10 @@ class Cages:
         self.running_objective = running_objective
         self.cur_test_preds = deepcopy(self.communication.testinputs)
 
+        # print('self.communication.is_unique_output: ', self.communication.is_unique_output)
+        # print('self.communication.is_unique_output != None: ', self.communication.is_unique_output != None)
+        # print('self.communication.dimension_status: ', self.communication.dimension_status)
+
     def check_objective_against_direct(self):
         copy_objective = deepcopy(self.running_objective)
         for n in range(len(copy_objective)):
@@ -77,11 +81,26 @@ class Cages:
                 return 'solved', ['cages', 'output_is_bg'], this_output, self.running_objective
 
             # output is the only nonbg in the input: 338
-            elif self.communication.is_unique_output != None and all([sum([y != self.communication.bg  for y in np.unique(x).tolist()]) == 1 for x in self.communication.traininputs]):
+            elif self.communication.is_unique_output != None:
+                # and all([sum([y != self.communication.bg  for y in np.unique(x).tolist()]) == 1 for x in self.communication.traininputs]):
                 print('hello from here')
-                test_nonbg = [np.unique(x).tolist()[1] for x in self.communication.testinputs]
-                this_output = [self.communication.build_a_prediction(self.communication.dimension_status, k, add_to_zero = l) for k, l in zip(self.communication.output_dim_preds, test_nonbg)]
-                return 'solved', ['cages', 'output_is_one_nonbg'], this_output, self.running_objective
+                unique_vals_traininputs  = [np.unique(x).tolist() for x in self.communication.traininputs]
+                print('unique_vals_traininputs: ', unique_vals_traininputs)
+                print([[n for n in y if n != x] for y, x in zip(unique_vals_traininputs, self.communication.is_unique_output)])
+                not_outputs = [[n for n in y if n != x] for y, x in zip(unique_vals_traininputs, self.communication.is_unique_output)]
+                print('not_outputs: ', not_outputs)
+                if all([x == not_outputs[0] for x in not_outputs]):
+                    print('hello from inside')
+                    to_remove = [not_outputs[0]]
+                    print('to_remove: ', to_remove)
+                    test_nonbg = [np.unique(x).tolist() for x in self.communication.testinputs]
+                    print('test_nonbg: ', test_nonbg)
+
+                    targets = [list(set(y) - set(x)) for y, x in zip(test_nonbg, to_remove * len(self.communication.testinputs))]
+                    if all([len(x) > 0 for x in targets]):
+                        print('targets: ', targets)
+                        this_output = [self.communication.build_a_prediction(self.communication.dimension_status, k, add_to_zero = l) for k, l in zip(self.communication.output_dim_preds, targets)]
+                        return 'solved', ['cages', 'output_is_one_nonbg'], this_output, self.running_objective
             # the next is direct transformation on tasks with no single bg and with known expected dimension: last in row
             elif type(self.communication.bg) != int and self.communication.objective_status != 'irr':
                 is_solved, mechanisms, this_output, this_running_objective = self.screen_direct_trnsformations()

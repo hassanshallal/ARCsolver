@@ -18,7 +18,6 @@ def captured_astar(grid, x, y, bg, all_):
         # print('wall at %d,%d' % (x, y))
         return False
 
-
     # mark as visited
     grid[x][y] = -1
     # explore neighbors clockwise starting by the one on the right
@@ -341,7 +340,6 @@ class Captured:
                 if len(b) > 0: # this condition may not be enough
                     self.running_objective = a
                     objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
-
                     if all(objective_satisfiability):
                         mechanisms = self.infer_on_mechanism(b, True) # we shall trigger any direct at this point
                     elif any(objective_satisfiability):

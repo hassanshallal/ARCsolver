@@ -3,6 +3,7 @@ from communicate import *
 
 from dimensionWork import *
 from captured import *
+from neighbored import *
 from cages import *
 
 class Inductive:
@@ -23,6 +24,7 @@ class Inductive:
 
         self.cages = Cages(self.communication, self.running_objective)
         self.captured = Captured(self.communication, self.running_objective, self.cur_test_preds)
+        self.neighbours = Neighbors(self.communication, self.running_objective, self.cur_test_preds)
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop
@@ -46,4 +48,6 @@ class Inductive:
         if self.solved == 'solved' or self.solved == 'partially solved':
             self.cur_test_preds = this_test_pred
             return
+
+
         return
