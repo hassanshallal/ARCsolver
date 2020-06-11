@@ -12,6 +12,7 @@ from itertools import permutations, combinations, product
 import numpy as np
 from functools import reduce
 import random
+from collections import Counter
 
 from deductive import *
 

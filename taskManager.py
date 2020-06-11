@@ -3,24 +3,6 @@ from utils import *
 from communicate import *
 from inductive import *
 
-def flip_test_train(task, num):
-    modified_task = deepcopy(task)
-    temp = deepcopy(modified_task['train'][num])
-    test = deepcopy(modified_task['test'])[0]
-    modified_task['train'][num] = test
-    modified_task['test'][0] = temp
-    return modified_task
-
-def confirmer(task):
-    training = task['train']
-    num_train = len(training)
-    scope = []
-    scope.append(TaskManager(task).inductive.solved)
-    for n in range(num_train):
-        modified_task = flip_test_train(task, n)
-        scope.append(TaskManager(modified_task).inductive.solved)
-    return all([x == 'solved' for x in scope])
-
 # forced_bg is used in reconfirmation on unconfirmed cases as a backup way to confirm we got the right thing
 # This is the first time we design in a human way, this is how the system actually can manage some ambiguity
 # both tasks [293, 338] failed initial reconfirmation and when we forced a bg of 0, we managed to get them to be
@@ -32,7 +14,15 @@ def confirmer(task):
 # in consideration and do some consensus when we have a list bg with a mode or something. We scored only two
 # on the evaluaton but it is interesting we initiated like 48 task, very nice.
 
-def explain_unconfirmed(task, forced_bg = None):
+def flip_test_train(task, num):
+    modified_task = deepcopy(task)
+    temp = deepcopy(modified_task['train'][num])
+    test = deepcopy(modified_task['test'])[0]
+    modified_task['train'][num] = test
+    modified_task['test'][0] = temp
+    return modified_task
+
+def confirmer(task):
     reference_task = TaskManager(task)
 
     training = task['train']
@@ -41,15 +31,12 @@ def explain_unconfirmed(task, forced_bg = None):
     scope.append(TaskManager(task).inductive.solved)
     for n in range(num_train):
         modified_task = flip_test_train(task, n)
-        this_task = TaskManager(modified_task, forced_bg)
-        print('bg: ', this_task.bg)
-        print('token_to_colors: ', this_task.token_to_colors)
-        print('test_token_to_color: ', this_task.test_token_to_color)
-        print('objective: ', this_task.objective)
-        print('running objective: ', this_task.inductive.running_objective)
-        plot_task_eval(modified_task, this_task.inductive.cur_test_preds)
-        scope.append(this_task.inductive.solved)
-    return scope
+        managed_mod_task = TaskManager(modified_task)
+        if managed_mod_task.inductive.solved != 'solved' and type(reference_task.bg) == int:
+            managed_mod_task = TaskManager(modified_task, reference_task.bg)
+        scope.append(managed_mod_task.inductive.solved)
+    #print(scope)
+    return all([x == 'solved' for x in scope])
 
 class TaskManager: # works on a task by task level, there are checks and balances
     # initiation defines several data members and uses class methods so as to output a problem graph
@@ -203,7 +190,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
                     return [get_this_objective(x) for x in current_boss], 'pred' # a case must have been a subset of another case for sure, partially reduced
 
         else:
-            return ['ARCsolver can not generate an objective for this task yet.'], 'None'
+            return ['ARCsolver can not generate an objective for this task yet.'], None
 
     # problem_graph --> assignments_leads, int_anchor_vals, asssignments_output
     def generate_set_assignemtns(self):

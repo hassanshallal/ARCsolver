@@ -72,35 +72,28 @@ class Cages:
                     self.cur_test_preds = this_output
         return is_solved, mechanisms, self.cur_test_preds, self.running_objective
 
+    def match_unique_output(self):
+        fg = self.communication.get_frequency_graph(self.communication.frequency_counter_traininputs)
+        iuo = self.communication.is_unique_output
+        if all([x in y for x, y in zip(iuo, fg)]):
+            indices = [y.index(x) for x, y in zip(iuo, fg)]
+            if all([x == indices[0] for x in indices]) and indices[0] % 2 == 0:
+                return True, indices[0]
+            else:
+                return False, None
+        return False, None
+
     def screen_cages(self):
         if self.communication.dimension_status == 'deduced':
-            test_bg = [get_background(x) for x in self.communication.testinputs]
-            # output is bg (no global bg): 128
-            if self.communication.is_unique_output == self.communication.bg:
-                this_output = [self.communication.build_a_prediction(self.communication.dimension_status, k, add_to_zero = l) for k, l in zip(self.communication.output_dim_preds, test_bg)]
-                return 'solved', ['cages', 'output_is_bg'], this_output, self.running_objective
+            if self.communication.is_unique_output != None: # 128, 99, 338
+                m, n = self.match_unique_output()
+                if m:
+                    test_fg = self.communication.get_frequency_graph(self.communication.frequency_counter_testinputs)
+                    test_props = [x[n] for x in test_fg]
 
-            # output is the only nonbg in the input: 338
-            elif self.communication.is_unique_output != None:
-                # and all([sum([y != self.communication.bg  for y in np.unique(x).tolist()]) == 1 for x in self.communication.traininputs]):
-                print('hello from here')
-                unique_vals_traininputs  = [np.unique(x).tolist() for x in self.communication.traininputs]
-                print('unique_vals_traininputs: ', unique_vals_traininputs)
-                print([[n for n in y if n != x] for y, x in zip(unique_vals_traininputs, self.communication.is_unique_output)])
-                not_outputs = [[n for n in y if n != x] for y, x in zip(unique_vals_traininputs, self.communication.is_unique_output)]
-                print('not_outputs: ', not_outputs)
-                if all([x == not_outputs[0] for x in not_outputs]):
-                    print('hello from inside')
-                    to_remove = [not_outputs[0]]
-                    print('to_remove: ', to_remove)
-                    test_nonbg = [np.unique(x).tolist() for x in self.communication.testinputs]
-                    print('test_nonbg: ', test_nonbg)
+                    this_output = [self.communication.build_a_prediction(self.communication.dimension_status, k, add_to_zero = l) for k, l in zip(self.communication.output_dim_preds, test_props)]
+                    return 'solved', ['cages', 'output_is_bg'], this_output, self.running_objective
 
-                    targets = [list(set(y) - set(x)) for y, x in zip(test_nonbg, to_remove * len(self.communication.testinputs))]
-                    if all([len(x) > 0 for x in targets]):
-                        print('targets: ', targets)
-                        this_output = [self.communication.build_a_prediction(self.communication.dimension_status, k, add_to_zero = l) for k, l in zip(self.communication.output_dim_preds, targets)]
-                        return 'solved', ['cages', 'output_is_one_nonbg'], this_output, self.running_objective
             # the next is direct transformation on tasks with no single bg and with known expected dimension: last in row
             elif type(self.communication.bg) != int and self.communication.objective_status != 'irr':
                 is_solved, mechanisms, this_output, this_running_objective = self.screen_direct_trnsformations()

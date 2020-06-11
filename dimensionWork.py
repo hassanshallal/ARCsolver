@@ -29,8 +29,18 @@ class DimensionWork:
         self.row_dim_ouputs = [x[0] for x in self.trainoutputs_shapes]
         self.is_one_column_output = all([x[1] == 1 and x[0] >= 1 for x in self.trainoutputs_shapes])
         self.col_dim_ouputs = [x[1] for x in self.trainoutputs_shapes]
-        
+
         self.dimension_status, self.output_dim_preds = self.cognify_dimensions()
+
+    def match_row_or_col(self, iuo):
+        fg = self.communication.get_frequency_graph(self.communication.frequency_counter_traininputs)
+        if all([x in y for x, y in zip(iuo, fg)]):
+            indices = [y.index(x) for x, y in zip(iuo, fg)]
+            if all([x == indices[0] for x in indices]): # we don't need this condition here for dimension and indices[0] % 2 == 0
+                return True, indices[0]
+            else:
+                return False, None
+        return False, None
 
     def cognify_dimensions(self):
         if self.is_same_ndim_couple and self.is_same_dim_couple:
@@ -47,6 +57,17 @@ class DimensionWork:
                         if self.is_sim_internal_int_div:
                             return 'partially deduced', [tuple(x) for x in self.testinput_shapes]
 
+            if self.is_one_row_output:
+                m, n = self.match_row_or_col(self.col_dim_ouputs)
+                if m:
+                    test_fg = self.communication.get_frequency_graph(self.communication.frequency_counter_testinputs)
+                    return 'deduced', [(1, x[n]) for x in test_fg]
+            if self.is_one_column_output:
+                m, n = self.match_row_or_col(self.row_dim_ouputs)
+                if m:
+                    test_fg = self.communication.get_frequency_graph(self.communication.frequency_counter_testinputs)
+                    return 'deduced', [(x[n], 1) for x in test_fg]
+                    
             if self.is_one_row_output and self.col_dim_ouputs == self.communication.freq_nonbg_traininputs:
                 return 'deduced', [(1, x) for x in self.communication.freq_nonbg_testinputs]
             if self.is_one_column_output and self.row_dim_ouputs == self.communication.freq_nonbg_traininputs:

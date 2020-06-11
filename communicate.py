@@ -19,10 +19,23 @@ class Communication:
 
         # The following data members are added along the way and used by other modules
         self.is_unique_output = self.find_unique_output()
-        self.freq_nonbg_traininputs = self.get_freq_nonbg_inputs(self.traininputs)
-        self.freq_nonbg_testinputs = self.get_freq_nonbg_inputs(self.testinputs)
+        self.freq_nonbg_traininputs = self.get_freq_nonbg_inputs(self.traininputs) # just the number of nonbg: utilized only in dimensionWork
+        self.freq_nonbg_testinputs = self.get_freq_nonbg_inputs(self.testinputs) # just the number of nonbg: utilized only in dimensionWork
+        self.frequency_counter_traininputs = [Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in self.traininputs]
+        self.frequency_counter_testinputs = [Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in self.testinputs]
+
+
         # Hyperparameters for inductive or any of its modules can be passed here
         # self.turn_on_direct_premature = False
+    def get_frequency_graph(self, frequency_counter):
+        frequency_graph = []
+        for x in frequency_counter:
+            this_list = []
+            for n in x:
+                this_list.append(n[0])
+                this_list.append(n[1])
+            frequency_graph.append(this_list)
+        return frequency_graph
 
     def find_unique_output(self):
         unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
@@ -36,50 +49,6 @@ class Communication:
             return [np.sum(x != self.bg) for x in lists]
         elif type(self.bg) == list:
             return [np.sum(x != y) for x, y in zip(lists, self.bg)]
-
-    def first_principles_diff_dim_checks(self, *args):
-        for n in args:
-            ext_len = len(n)
-            int_len = len(n[0])
-            for x in range(ext_len):
-                for y in range(int_len):
-                    if len(n[x][y][0]) == 0 or len(n[x][y][1]) == 0:
-                        return False
-        return True
-
-    def first_principles_diff_dim_signal_size(self, *args):
-        zero_signal = []
-        one_signal = []
-
-        for n in args:
-            ext_len = len(n)
-            int_len = len(n[0])
-            for x in range(ext_len):
-                for y in range(int_len):
-                    zero_signal.append(len(n[x][y][0]))
-                    one_signal.append(len(n[x][y][1]))
-
-        return zero_signal, one_signal
-
-    def first_principles_diff_dim_signal_class(self, results):
-        overall_cur_invest_num_unique = []
-        overall_cur_invest_unique = []
-        for n in range(len(results)): # 3 for captured
-            cur_invest = results[n]
-            cur_invest_num_unique = []
-            cur_invest_unique = []
-            for x in range(len(cur_invest)): # num_train
-                this_result = cur_invest[x]
-                values_1 = get_set_of_values_1(this_result)
-                cur_invest_num_unique.append(len(values_1))
-                if len(values_1) == 1:
-                    cur_invest_unique.append(values_1.pop())
-                else:
-                    cur_invest_unique.append(values_1)
-            overall_cur_invest_num_unique.append(cur_invest_num_unique)
-            overall_cur_invest_unique.append(cur_invest_unique)
-
-        return overall_cur_invest_num_unique, overall_cur_invest_unique
 
     # The following are supposed to be generic, unfortunately  infer_on_mechanism is geared towards captured module
 

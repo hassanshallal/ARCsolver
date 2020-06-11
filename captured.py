@@ -81,6 +81,50 @@ class Captured:
         captured[0] = []
         return captured
 
+    def captured_diff_dim_checks(self, *args):
+        for n in args:
+            ext_len = len(n)
+            int_len = len(n[0])
+            for x in range(ext_len):
+                for y in range(int_len):
+                    if len(n[x][y][0]) == 0 or len(n[x][y][1]) == 0:
+                        return False
+        return True
+
+    def captured_diff_dim_signal_size(self, *args):
+        zero_signal = []
+        one_signal = []
+
+        for n in args:
+            ext_len = len(n)
+            int_len = len(n[0])
+            for x in range(ext_len):
+                for y in range(int_len):
+                    zero_signal.append(len(n[x][y][0]))
+                    one_signal.append(len(n[x][y][1]))
+
+        return zero_signal, one_signal
+
+    def captured_diff_dim_signal_class(self, results):
+        overall_cur_invest_num_unique = []
+        overall_cur_invest_unique = []
+        for n in range(len(results)): # 3 for captured
+            cur_invest = results[n]
+            cur_invest_num_unique = []
+            cur_invest_unique = []
+            for x in range(len(cur_invest)): # num_train
+                this_result = cur_invest[x]
+                values_1 = get_set_of_values_1(this_result)
+                cur_invest_num_unique.append(len(values_1))
+                if len(values_1) == 1:
+                    cur_invest_unique.append(values_1.pop())
+                else:
+                    cur_invest_unique.append(values_1)
+            overall_cur_invest_num_unique.append(cur_invest_num_unique)
+            overall_cur_invest_unique.append(cur_invest_unique)
+
+        return overall_cur_invest_num_unique, overall_cur_invest_unique
+
     def captured_situation_target_interior(self, test_points, arr, n, m, bg, order_, captured):
         if [n, m] in test_points:
             if arr[n][m] != bg:
@@ -153,17 +197,7 @@ class Captured:
             train_task_output_diag.append(diag_)
             train_task_output_all.append(all_)
 
-        test_task_output_ver_hor = []
-        test_task_output_diag = []
-        test_task_output_all = []
-
-        for n in range(len(self.communication.testinputs)):
-            ver_hor_, diag_, all_ = self.captured_situation_whole(self.communication.testinputs[n])
-            test_task_output_ver_hor.append(ver_hor_)
-            test_task_output_diag.append(diag_)
-            test_task_output_all.append(all_)
-
-        return [train_task_output_ver_hor, train_task_output_diag, train_task_output_all], [test_task_output_ver_hor, test_task_output_diag, test_task_output_all]
+        return [train_task_output_ver_hor, train_task_output_diag, train_task_output_all]
 
     def assess_captured_holistic_testing(self, bg = None):
         test_task_output_ver_hor = []
@@ -243,15 +277,17 @@ class Captured:
     def validate_cap(self, overall_cur_invest_num_unique, overall_cur_invest_unique, order_, unique_train_outputs, b):
         if is_list_equal_1(overall_cur_invest_num_unique[order_]):
             if overall_cur_invest_unique[order_] == unique_train_outputs:
-                test_num_unique, test_unique = self.communication.first_principles_diff_dim_signal_class(b)
+                test_num_unique, test_unique = self.captured_diff_dim_signal_class(b)
                 if is_list_equal_1(test_num_unique[order_]):
                     return True, test_unique
+                else:
+                    return False, []
             else:
                 return False, []
         else:
             return False, []
 
-    def iterate_validating_cap(self, overall_cur_invest_num_unique, overall_cur_invest_unique, b, a):
+    def iterate_validating_cap(self, overall_cur_invest_num_unique, overall_cur_invest_unique, a, b):
         for x in [2, 0, 1]:
             m, n = self.validate_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, x, self.communication.is_unique_output, b)
             if m:
@@ -262,8 +298,9 @@ class Captured:
                     return 'solved', ['cap_ver_hor', 'one_unique_captured'], this_output, None
                 elif x == 1:
                     return 'solved', ['cap_diag', 'one_unique_captured'], this_output, None
-        return 'objective initiated', ['captured_cells_detected'], self.cur_test_preds, [a, b]
-
+            else:
+                return 'unsolved', [], self.cur_test_preds, None # currently under test
+                #return 'objective initiated', ['captured_cells_detected'], self.cur_test_preds, [a, b]
 # generalize infer_on_mechanism
     def infer_on_mechanism(self, signal_, direct = False): # signal_ = b above
         mechanisms = set()
@@ -287,7 +324,7 @@ class Captured:
                     mechanisms.add(n[2])
                     self.cur_test_preds = self.communication.apply_direct_transformation((n[0], n[1]), self.cur_test_preds)
                     # in cur_test_preds, replace n[0] with n[1]
-                elif n[2] in ['cap_all', 'cap_ver_hor', 'cap_diag']:
+                elif 'cap_' in n[2]: # in ['all', 'cap_ver_hor', 'cap_diag']:
                     mechanisms.add(n[2])
                     if n[2] == 'cap_all':
                         this_signal = signal_[2]
@@ -319,18 +356,18 @@ class Captured:
                                 self.cur_test_preds = self.communication.objectively_build_a_prediction(n[4], cap_coords, self.cur_test_preds)
 
         return sorted(list(mechanisms))
-
     # The following is the screening protocola which needs alot of cleaning
     # ya the screen dimensions is a scary method, needs a lot of work now gets: 222, 268, 288, 306
     # screen dimensions
     def screen_captured(self): # This is abstract
-        if self.communication.objective_status == 'None' or self.communication.is_unique_output != None:
-            a, b = self.assess_captured_holistic_training()
-            if not self.communication.first_principles_diff_dim_checks(a) or self.communication.is_unique_output == None:
-                return 'unsolved', [], [], None
+        if self.communication.objective_status == None and self.communication.is_unique_output != None: # and is used rather than or in order to prevent random capturing modules
+            a = self.assess_captured_holistic_training()
+            if self.captured_diff_dim_checks(a):
+                overall_cur_invest_num_unique, overall_cur_invest_unique = self.captured_diff_dim_signal_class(a)
+                b = self.assess_captured_holistic_testing()
+                return self.iterate_validating_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, a, b)
             else:
-                overall_cur_invest_num_unique, overall_cur_invest_unique = self.communication.first_principles_diff_dim_signal_class(a)
-                return self.iterate_validating_cap(overall_cur_invest_num_unique, overall_cur_invest_unique, b, a)
+                return 'unsolved', [], self.cur_test_preds, None
 
         else:
             is_solved = 'unsolved'
@@ -366,4 +403,4 @@ class Captured:
 # get a list of points on the edges
 # Once a system goes for evaluation, it starts with evaluation on training, if things
 # are fine, it progresses to evaluation on testing, this is an internal decision at the moment.
-# assess_captured_holistic_training(traininputs, testinputs)
+# assess_captured_holistic(traininputs, testinputs)
