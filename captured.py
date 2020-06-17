@@ -1,3 +1,11 @@
+
+# https://www.laurentluce.com/posts/solving-mazes-using-python-simple-recursivity-and-a-search/
+# the captured astar algorithm is not built on the a-star algorithm, it is actually based on the
+# basic recursive inefficient implemenation as compared to a-star. the implementation of a-star
+# is quite more involving and we may look at it in a latter development stage.
+# Right now, the implementation we have is flexible enough to allow us to locate 3 classes
+# of capturing (ver_hor, diag, all_)
+
 # solved: 1, 97, 119, 186, 250, 293, 337, 345
 # needs other first principles: 43, 84, 101, 124, 155, 159, 203, 366
 # current_space = {'all_', 'ver_hor', 'diag'}

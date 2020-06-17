@@ -92,7 +92,7 @@ class Cages:
                     test_props = [x[n] for x in test_fg]
 
                     this_output = [self.communication.build_a_prediction(self.communication.dimension_status, k, add_to_zero = l) for k, l in zip(self.communication.output_dim_preds, test_props)]
-                    return 'solved', ['cages', 'output_is_bg'], this_output, self.running_objective
+                    return 'solved', ['cages', 'output_is_one_color'], this_output, self.running_objective
 
             # the next is direct transformation on tasks with no single bg and with known expected dimension: last in row
             elif type(self.communication.bg) != int and self.communication.objective_status != 'irr':

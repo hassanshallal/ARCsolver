@@ -27,12 +27,12 @@ def get_nb_location_space():
     nb_shifts = get_neighbour_shifts([1, -1, 0])
 
     all_combs = set()
-    all_combs.add(tuple(nb_shifts))
+    all_combs.add(tuple(nb_shifts)) # added 8
 
     for n in nb_shifts:
-        all_combs.add((n, ))
+        all_combs.add((n, )) # added ones
 
-    for n in range(2, 8):
+    for n in range(2, 8): # between 2 and 8
         the_list = list(itertools.combinations(get_neighbour_shifts([1, -1, 0]), n))
         for x in the_list:
             all_combs.add(x)
@@ -84,12 +84,12 @@ class Neighbors:
                 output[v] = []
             output[v].append(list(k))
         trimmed_output = {k: len(v) for k, v in output.items()}
-        return location_output, trimmed_location_output, output, trimmed_output
+        return location_output, trimmed_location_output, output, trimmed_output, len(trimmed_output)
 
     def neighbored_situation_whole(self, maze):
         results = {}
-        for n in range(1, maze.shape[0]-1):
-            for m in range(1, maze.shape[1]-1):
+        for n in range(0, maze.shape[0]):
+            for m in range(0, maze.shape[1]):
                 results[(n, m), maze[n][m]] = self.neighbored_astar(maze, n, m)
         return results
 
@@ -97,76 +97,122 @@ class Neighbors:
         results = {}
         test_points = test_points.tolist()
         for x in test_points:
-            results.append(self.neighbored_astar(maze, x[0], x[1]))
+            results[tuple(x)] = self.neighbored_astar(maze, x[0], x[1])
         return results
 
-    def assess_neighbored_holistic_testing(self):
-        results = []
-        for n in range(len(self.communication.testinputs)):
-            results.append(self.neighbored_situation_whole(self.communication.testinputs[n]))
-        return results
 
-    def check_objective_against_neighbored(self, bg):
+    # the following two compare functions focus on only one nb based comparison.
+    def get_set_of_lengths(self, results_dict):
+        lens = set()
+        lens_association = {}
+        for k, v in results_dict.items():
+            lens.add(v[4])
+            if v[4] not in lens_association.keys():
+                lens_association[v[4]] = []
+            lens_association[v[4]].append((k, v[3]))
+            print(v[4], k, v[3])
+
+        return lens, lens_association
+
+    def compare_len_trimmed_dicts_targeted(self, result1, result2):
+        len_1 , lens_association_1 = self.get_set_of_lengths(result1)
+        len_2, lens_association_2 = self.get_set_of_lengths(result2)
+        return len_1 != len_2, (len_1, len_2), (lens_association_1, lens_association_2)
+
+    def compare_len_trimmed_dicts_holistic(self, result, code = None):
+        test_outputs = []
+        for m in range(len(result)):
+            len_1 , lens_association_1 = self.get_set_of_lengths(result[m])
+            if code == None:
+                test_outputs.append((len_1 , lens_association_1))
+            else:
+                first_group = sorted(list(code[0]))
+                first_group_coords = []
+                for n in first_group:
+                    if n in lens_association_1.keys():
+                        first_group_coords.append(lens_association_1[n])
+
+                second_group = sorted(list(code[0]))
+                second_group_coords = []
+                for n in second_group:
+                    if n in lens_association_1.keys():
+                        second_group_coords.append(lens_association_1[n])
+
+                test_outputs.append((first_group_coords, second_group_coords))
+        return test_outputs
+
+
+    def check_objective_against_neighbored(self): # return a new objective and a neighbor code
         copy_objective = deepcopy(self.running_objective)
+        print('copy_objective a: ', copy_objective)
         changed = False
         if not is_list_of_list_of_list(copy_objective):
             changed = True
             copy_objective = [copy_objective]
+
+        print('copy_objective b: ', copy_objective)
+        y = tuple() # to be returned instead of a code
         for x in range(len(copy_objective)):
             for n in range(len(copy_objective[x])):
                 this_check = copy_objective[x][n]
+                print(this_check)
                 if len(this_check) == 2:
                     first_target_coords = retrieve_coords_from_assignments(this_check[0], self.communication.asssignments_output)
                     second_target_coords = retrieve_coords_from_assignments(this_check[1], self.communication.asssignments_output)
                     if len(first_target_coords) == len(second_target_coords):
                         for m in range(len(first_target_coords)):
-                            first_target_result = self.neighbored_situation_target(self.communication.traininputs[m], first_target_coords[m], bg)
-                            second_target_result = self.neighbored_situation_target(self.communication.traininputs[m], second_target_coords[m], bg)
-                            # comparison = [x != y  for x, y in zip(first_target_result, second_target_result)]
-                            # if comparison[2]:
-                            #     if first_target_result[2] and not second_target_result[2]:
-                            #         cap = (this_check[0])
-                            #         uncap = (this_check[1])
-                            #     elif not first_target_result[2] and second_target_result[2]:
-                            #         cap = (this_check[1])
-                            #         uncap = (this_check[0])
-                            #     copy_objective[x][n] = [this_check[0], this_check[1], 'cap_all', uncap, cap]
-                            #     continue
-                            # elif comparison[0] or comparison[1]:
-                            #     if comparison[0]:
-                            #         target, method = 0, 'cap_ver_hor'
-                            #     else:
-                            #         target, method = 1, 'cap_diag'
-                            #     if first_target_result[target] and not second_target_result[target]:
-                            #         cap = (this_check[0])
-                            #         uncap = (this_check[1])
-                            #     elif not first_target_result[target] and second_target_result[target]:
-                            #         cap = (this_check[1])
-                            #         uncap = (this_check[0])
-                            #     copy_objective[x][n] = [this_check[0], this_check[1], method, uncap, cap]
-                            #     continue
+                            first_target_result = self.neighbored_situation_target(self.communication.traininputs[m], first_target_coords[m])
+                            second_target_result = self.neighbored_situation_target(self.communication.traininputs[m], second_target_coords[m])
+                            w, y, z = self.compare_len_trimmed_dicts_targeted(first_target_result, second_target_result)
+                            if w:
+                                print('caught nbed')
+                                print('y is:', y)
+                                if len(y[0]) > len(y[1]):
+                                    print('exchange!')
+                                    nbed = (this_check[0])
+                                    unnbed =  (this_check[1])
+                                    new_tuple = tuple((y[1], y[0]))
+                                    y = new_tuple
+                                    copy_objective[x][n] = [this_check[0], this_check[1], 'num_nbed', unnbed, nbed]
+                                elif len(y[0]) < len(y[1]):
+                                    print('no exchange!')
+                                    nbed = (this_check[1])
+                                    unnbed =  (this_check[0])
+                                    copy_objective[x][n] = [this_check[0], this_check[1], 'num_nbed', unnbed, nbed]
+        print('copy_objective after: ', copy_objective)
         if changed:
-            return copy_objective[0]
+            return copy_objective[0], y
         else:
-            return copy_objective
+            return copy_objective, y
 
-    def assess_neighbored_target_training(self, bg):
+    def assess_neighbored_targeted_testing(self, candidate_code):
+        results = []
+        for n in range(len(self.communication.testinputs)):
+            results.append(self.neighbored_situation_whole(self.communication.testinputs[n]))
+
+        return self.compare_len_trimmed_dicts_holistic(results, candidate_code)
+
+
+    def assess_neighbored_target_training(self):
         if len(self.running_objective) > 20:
             return self.running_objective, []
 
-        new_objective = self.check_objective_against_neighbored(bg)
+        new_objective, candidate_code = self.check_objective_against_neighbored()
+        print('new_objective: ', new_objective)
         test_rep = []
-        if new_objective != self.running_objective:
-            test_rep = self.assess_neighbored_holistic_testing(bg)
+        if new_objective != self.running_objective and candidate_code != tuple():
+            test_rep = self.assess_neighbored_targeted_testing(candidate_code)
 
         return new_objective, test_rep
 
     def infer_on_mechanism(self, signal_, direct = False): # signal_ = b above
+        print('entered infer_on_mechanism')
         mechanisms = set()
         decided_change_tuples = set()
 
         # make sure you turn off first not last, this is an example of massaging an objective
         for n in range(len(self.running_objective)-1):
+            print('a in infer_on_mechanism')
             if len(self.running_objective[n]) == 3 and len(self.running_objective[n+1]) == 3 and (self.running_objective[n][1] != 'bg' and self.running_objective[n+1][1] == 'bg'):
                 temp = self.running_objective[n]
                 self.running_objective[n] = self.running_objective[n+1]
@@ -174,46 +220,46 @@ class Neighbors:
 
         # this is a heuristic for red cases
         if self.communication.objective_status == 'red' or (self.communication.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])):
+            print('b in infer_on_mechanism')
             # In case of 'obd' cases, the test expectation is not ready to handle unsatisfiable objectives
             self.running_objective = self.communication.set_test_expectations(self.running_objective)
 
         for n in self.running_objective:
+            print(self.running_objective)
+            print('c in infer_on_mechanism')
             if len(n) > 2:
+                print('d in infer_on_mechanism')
                 if n[2] == 'direct' and direct: # Major hyperparameter candidate
+                    print('e in infer_on_mechanism')
                     mechanisms.add(n[2])
                     self.cur_test_preds = self.communication.apply_direct_transformation((n[0], n[1]), self.cur_test_preds)
-                    # in cur_test_preds, replace n[0] with n[1]
-                # elif n[2] in ['cap_all', 'cap_ver_hor', 'cap_diag']:
-                #     mechanisms.add(n[2])
-                #     if n[2] == 'cap_all':
-                #         this_signal = signal_[2]
-                #     elif n[2] == 'cap_ver_hor':
-                #         this_signal = signal_[0]
-                #     elif n[2] == 'cap_diag':
-                #         this_signal = signal_[1]
-                #
-                #     if n[3][0] == n[3][1]:
-                #         coords = [x[1] for x in this_signal]
-                #         if n[4] not in decided_change_tuples:
-                #             decided_change_tuples.add(n[4])
-                #             self.cur_test_preds = self.communication.objectively_build_a_prediction(n[4], coords, self.cur_test_preds)
-                #
-                #     elif n[4][0] == n[4][1]:
-                #         coords = [x[0] for x in this_signal]
-                #         if n[3] not in decided_change_tuples:
-                #             decided_change_tuples.add(n[3])
-                #             self.cur_test_preds = self.communication.objectively_build_a_prediction(n[3], coords, self.cur_test_preds)
-                #     else:
-                #         if n[3] not in decided_change_tuples and n[4] not in decided_change_tuples: # we can't repeat assignments, very imp precondition
-                #             uncap_coords = [x[0] for x in this_signal]
-                #             if n[3] not in decided_change_tuples:
-                #                 decided_change_tuples.add(n[3])
-                #                 self.cur_test_preds = self.communication.objectively_build_a_prediction(n[3], uncap_coords, self.cur_test_preds)
-                #             cap_coords = [x[1] for x in this_signal]
-                #             if n[4] not in decided_change_tuples:
-                #                 decided_change_tuples.add(n[4])
-                #                 self.cur_test_preds = self.communication.objectively_build_a_prediction(n[4], cap_coords, self.cur_test_preds)
-        return sorted(list(mechanisms))
+                elif n[2] == 'num_nbed':
+                    print('f in infer_on_mechanism')
+                    mechanisms.add(n[2])
+                    if n[3][0] == n[3][1]:
+                        coords = [x[1] for x in this_signal]
+                        if n[4] not in decided_change_tuples:
+                            decided_change_tuples.add(n[4])
+                            self.cur_test_preds = self.communication.objectively_build_a_prediction(n[4], coords, self.cur_test_preds)
+
+                    elif n[4][0] == n[4][1]:
+                        coords = [x[0] for x in this_signal]
+                        if n[3] not in decided_change_tuples:
+                            decided_change_tuples.add(n[3])
+                            self.cur_test_preds = self.communication.objectively_build_a_prediction(n[3], coords, self.cur_test_preds)
+
+                    else:
+                        if n[3] not in decided_change_tuples and n[4] not in decided_change_tuples: # we can't repeat assignments, very imp precondition
+                            unnbed_coords = [x[0] for x in this_signal]
+                            if n[3] not in decided_change_tuples:
+                                decided_change_tuples.add(n[3])
+                                self.cur_test_preds = self.communication.objectively_build_a_prediction(n[3], uncap_coords, self.cur_test_preds)
+                            nbed_coords = [x[1] for x in this_signal]
+                            if n[4] not in decided_change_tuples:
+                                decided_change_tuples.add(n[4])
+                                self.cur_test_preds = self.communication.objectively_build_a_prediction(n[4], cap_coords, self.cur_test_preds)
+
+            return sorted(list(mechanisms))
 
     def screen_neighbored(self):# This is abstract
         if self.communication.objective_status == None and self.communication.is_unique_output != None: # and is used rather than or in order to prevent random capturing modules
@@ -222,8 +268,8 @@ class Neighbors:
             is_solved = 'unsolved'
             mechanisms = []
             if type(self.communication.bg) == int:
-                a, b =  self.assess_neighbored_target_training(self.communication.bg)
-                if len(b) > 0: # this condition may not be enough
+                a, b =  self.assess_neighbored_target_training()
+                if len(b) > 0 and type(b[0]) == list: # this condition may not be enough
                     self.running_objective = a
                     objective_satisfiability = [len(x) == 3 or len(x) == 5 for x in a]
                     if all(objective_satisfiability):
