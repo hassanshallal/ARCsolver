@@ -322,7 +322,7 @@ class Captured:
                 self.running_objective[n+1] = temp
 
         # this is a heuristic for red cases
-        if self.communication.objective_status == 'red' or (self.communication.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])):
+        if self.communication.objective_status == 'red': # or (self.communication.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])):
             # In case of 'obd' cases, the test expectation is not ready to handle unsatisfiable objectives
             self.running_objective = self.communication.set_test_expectations(self.running_objective)
 

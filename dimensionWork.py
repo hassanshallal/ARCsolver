@@ -67,7 +67,7 @@ class DimensionWork:
                 if m:
                     test_fg = self.communication.get_frequency_graph(self.communication.frequency_counter_testinputs)
                     return 'deduced', [(x[n], 1) for x in test_fg]
-                    
+
             if self.is_one_row_output and self.col_dim_ouputs == self.communication.freq_nonbg_traininputs:
                 return 'deduced', [(1, x) for x in self.communication.freq_nonbg_testinputs]
             if self.is_one_column_output and self.row_dim_ouputs == self.communication.freq_nonbg_traininputs:
@@ -104,6 +104,7 @@ class DimensionWork:
                     is_contracted = all([np.all(x[::int(1/y[0]),::int(1/y[1])] == z) for x, y, z in zip(self.communication.traininputs, self.in_mult_fact, self.communication.trainoutputs)])
                 else:
                     is_contracted = False
+
                 if is_expanded or is_contracted:
                     if len(self.communication.testinputs) == 1:
                         this_in_mult_fact = [self.in_mult_fact[0]]

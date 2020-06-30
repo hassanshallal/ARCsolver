@@ -77,7 +77,7 @@ class Cages:
         iuo = self.communication.is_unique_output
         if all([x in y for x, y in zip(iuo, fg)]):
             indices = [y.index(x) for x, y in zip(iuo, fg)]
-            if all([x == indices[0] for x in indices]) and indices[0] % 2 == 0:
+            if all([x == indices[0] for x in indices]) and indices[0] % 2 == 0: # values are limited to %2 == 0
                 return True, indices[0]
             else:
                 return False, None

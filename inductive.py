@@ -40,6 +40,7 @@ class Inductive:
             self.mechanisms.append(mechanisms)
             self.cur_test_preds = this_testpred
             return
+
         # go cages and be careful or othwrwise yo'll screw it up
         cages = Cages(self.communication, self.running_objective)
         self.solved, mechanisms, this_testpred, self.running_objective = cages.screen_cages()

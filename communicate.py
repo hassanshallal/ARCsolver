@@ -54,13 +54,16 @@ class Communication:
 
     def set_test_expectations(self, current_objective):
         assignments_leads = deepcopy(self.assignments_leads)
+        bare_assignemnt_leads = get_bare_assignment_leads(assignments_leads))
         test_token_to_color = deepcopy(self.test_token_to_color)
 
         if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
+            print('b')
             del test_token_to_color['bg']
 
         if len(test_token_to_color) > len(current_objective):
-            diff = list(set(test_token_to_color.keys()) - get_bare_assignment_leads(assignments_leads))
+            print('c')
+            diff = list(set(test_token_to_color.keys()) - bare_assignemnt_leads
             for n in diff:
                 if self.test_token_to_color[n] in list(itertools.chain.from_iterable(self.testinputs_vals)):
                     this_extra = expand_obj(deepcopy(current_objective[0]), n)
@@ -68,6 +71,7 @@ class Communication:
             return current_objective
 
         if len(test_token_to_color) < len(current_objective):
+            print('d')
             new_objective = []
             for n in current_objective:
                 if len(n) == 3 and n[0] in test_token_to_color.keys():
