@@ -248,11 +248,11 @@ class Captured:
                                     uncap = (this_check[0])
                                 copy_objective[x][n] = [this_check[0], this_check[1], 'cap_all', uncap, cap]
                                 continue
-                            elif comparison[0] or comparison[1]:
-                                if comparison[0]:
-                                    target, method = 0, 'cap_ver_hor'
-                                else:
-                                    target, method = 1, 'cap_diag'
+                            elif comparison[0]: #or comparison[1]
+                                #if comparison[0]:
+                                target, method = 0, 'cap_ver_hor'
+                                # else:
+                                #     target, method = 1, 'cap_diag'
                                 if first_target_result[target] and not second_target_result[target]:
                                     cap = (this_check[0])
                                     uncap = (this_check[1])
@@ -304,8 +304,8 @@ class Captured:
                     return 'solved', ['cap_all', 'one_unique_captured'], this_output, None
                 elif x == 0:
                     return 'solved', ['cap_ver_hor', 'one_unique_captured'], this_output, None
-                elif x == 1:
-                    return 'solved', ['cap_diag', 'one_unique_captured'], this_output, None
+                # elif x == 1:
+                #     return 'solved', ['cap_diag', 'one_unique_captured'], this_output, None
             else:
                 return 'unsolved', [], self.cur_test_preds, None # currently under test
                 #return 'objective initiated', ['captured_cells_detected'], self.cur_test_preds, [a, b]
@@ -338,8 +338,8 @@ class Captured:
                         this_signal = signal_[2]
                     elif n[2] == 'cap_ver_hor':
                         this_signal = signal_[0]
-                    elif n[2] == 'cap_diag':
-                        this_signal = signal_[1]
+                    # elif n[2] == 'cap_diag':
+                    #     this_signal = signal_[1]
 
                     if n[3][0] == n[3][1]:
                         coords = [x[1] for x in this_signal]

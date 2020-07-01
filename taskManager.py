@@ -93,6 +93,8 @@ class TaskManager: # works on a task by task level, there are checks and balance
         # use above to tokenize the test and have a test_token_to_color_dict
         self.size_sorted_nonbg = self.get_size_sorted_nonbg()
         self.test_token_to_color = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
+        
+
         self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.testoutputs)
 
         # induction
