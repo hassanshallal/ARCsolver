@@ -93,9 +93,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
         # use above to tokenize the test and have a test_token_to_color_dict
         self.size_sorted_nonbg = self.get_size_sorted_nonbg()
         self.test_token_to_color = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
-        
+        self.test_objective = self.set_test_expectations()
 
-        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.testoutputs)
+        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.test_objective, self.testoutputs)
 
         # induction
         self.inductive = Inductive(self.communication)
@@ -262,3 +262,46 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 final_test_nonbg = sorted(list(get_common_nonbg(testinputs_vals)))
                 test_color_to_token = get_col_to_token_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
                 return get_token_to_color(test_color_to_token)
+
+
+    # The following are supposed to be generic, unfortunately  infer_on_mechanism is geared towards captured module
+    def set_test_expectations(self):
+        current_objective = deepcopy(self.objective)
+        if self.objective_status == 'obd' or self.objective_status == 'irr':
+            return current_objective
+
+        elif self.objective_status == 'red' or self.objective_status == 'pred':
+            bare_assignemnt_leads = get_bare_assignment_leads(self.assignments_leads)
+            test_token_to_color = deepcopy(self.test_token_to_color)
+
+            if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
+                print('b')
+                del test_token_to_color['bg']
+
+            if len(test_token_to_color) > len(bare_assignemnt_leads):
+                print('******** setting_test_expectaion_expansion **********')
+                print('c')
+                diff = list(set(test_token_to_color.keys()) - bare_assignemnt_leads)
+                for n in diff:
+                    if self.test_token_to_color[n] in list(itertools.chain.from_iterable(self.testinputs_vals)):
+                        this_extra = expand_obj(deepcopy(current_objective[0]), n)
+                        current_objective.append(this_extra)
+                return current_objective
+
+            if len(test_token_to_color) < len(bare_assignemnt_leads):
+                print('******** setting_test_expectaion_contraction **********')
+                print('d')
+                new_objective = []
+                for n in current_objective:
+                    if len(n) == 3 and n[0] in test_token_to_color.keys():
+                        new_objective.append(n)
+
+                target = set(test_token_to_color.keys())
+                for n in list(target):
+                    is_found_obj = find_target_obj(current_objective, n)
+                    if is_found_obj != None:
+                        new_objective.append(is_found_obj)
+
+                return new_objective
+
+            return current_objective # this is a more difficult case where we need to really convolve more cognition

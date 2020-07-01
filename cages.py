@@ -4,9 +4,9 @@
 from utils import *
 
 class Cages:
-    def __init__(self, communication, running_objective):
+    def __init__(self, communication):
         self.communication = communication
-        self.running_objective = running_objective
+        self.running_objective = self.communication.test_objective
         self.cur_test_preds = deepcopy(self.communication.testinputs)
 
         # print('self.communication.is_unique_output: ', self.communication.is_unique_output)
@@ -44,7 +44,7 @@ class Cages:
         return coords
 
     def assess_direct(self):
-        if len(self.running_objective) > 20:
+        if self.running_objective == None or len(self.running_objective) > 20:
             return self.running_objective, []
         new_objective = self.check_objective_against_direct()
         test_rep = []
@@ -60,7 +60,7 @@ class Cages:
             # this next feedback mechanism will need to be better for cases 202
             if self.communication.objective_status == 'red':
                 # In case of 'obd' cases, the test expectation is not ready to handle unsatisfiable objectives
-                a = self.communication.set_test_expectations(a)
+                a = self.communication.test_objective
             self.running_objective = a
             objective_satisfiability = [len(x) == 3 for x in a]
             if all(objective_satisfiability):

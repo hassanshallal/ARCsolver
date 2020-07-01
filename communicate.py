@@ -2,7 +2,7 @@
 from utils import *
 
 class Communication:
-    def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testinputs_vals, testoutputs = None):
+    def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testinputs_vals, test_objective, testoutputs = None):
         self.traininputs = traininputs
         self.trainoutputs = trainoutputs
         self.testinputs = testinputs
@@ -15,6 +15,7 @@ class Communication:
         self.token_to_colors = token_to_colors
         self.test_token_to_color = test_token_to_color
         self.testinputs_vals = testinputs_vals
+        self.test_objective = test_objective
         self.testoutputs = testoutputs
 
         # The following data members are added along the way and used by other modules
@@ -49,43 +50,6 @@ class Communication:
             return [np.sum(x != self.bg) for x in lists]
         elif type(self.bg) == list:
             return [np.sum(x != y) for x, y in zip(lists, self.bg)]
-
-    # The following are supposed to be generic, unfortunately  infer_on_mechanism is geared towards captured module
-
-    def set_test_expectations(self, current_objective):
-        assignments_leads = deepcopy(self.assignments_leads)
-        bare_assignemnt_leads = get_bare_assignment_leads(assignments_leads)
-        test_token_to_color = deepcopy(self.test_token_to_color)
-
-        if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
-            print('b')
-            del test_token_to_color['bg']
-
-        if len(test_token_to_color) > len(current_objective):
-            print('c')
-            diff = list(set(test_token_to_color.keys()) - bare_assignemnt_leads)
-            for n in diff:
-                if self.test_token_to_color[n] in list(itertools.chain.from_iterable(self.testinputs_vals)):
-                    this_extra = expand_obj(deepcopy(current_objective[0]), n)
-                    current_objective.append(this_extra)
-            return current_objective
-
-        if len(test_token_to_color) < len(current_objective):
-            print('d')
-            new_objective = []
-            for n in current_objective:
-                if len(n) == 3 and n[0] in test_token_to_color.keys():
-                    new_objective.append(n)
-
-            target = set(test_token_to_color.keys())
-            for n in list(target):
-                is_found_obj = find_target_obj(current_objective, n)
-                if is_found_obj != None:
-                    new_objective.append(is_found_obj)
-
-            return new_objective
-
-        return current_objective # this is a more difficult case where we need to really convolve more cognition
 
     # creating output with objectives
     def objectively_build_a_prediction(self, change_tuple, coordinates, cur_test_pred):

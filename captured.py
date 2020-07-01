@@ -59,11 +59,11 @@ def captured_astar(grid, x, y, bg, all_):
         return False
 
 class Captured:
-    def __init__(self, communication, running_objective, cur_test_preds):
+    def __init__(self, communication, cur_test_preds):
         self.communication = communication
 
         # print(self.communication.dimension_status, self.communication.output_dim_preds)
-        self.running_objective = running_objective
+        self.running_objective = self.communication.test_objective
         self.cur_test_preds = cur_test_preds
 
     # For reasons I don't have time to investigate, we need to wrap up the astar algorithm in order to get it to work
@@ -272,7 +272,7 @@ class Captured:
         # by the way must be a pretty basic first principle operation requiring none of the long objective
         # based screenings
 
-        if len(self.running_objective) > 20:
+        if self.running_objective == None or len(self.running_objective) > 20:
             return self.running_objective, []
 
         new_objective = self.check_objective_against_captured(bg)
@@ -322,9 +322,9 @@ class Captured:
                 self.running_objective[n+1] = temp
 
         # this is a heuristic for red cases
-        if self.communication.objective_status == 'red': # or (self.communication.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])):
-            # In case of 'obd' cases, the test expectation is not ready to handle unsatisfiable objectives
-            self.running_objective = self.communication.set_test_expectations(self.running_objective)
+        # if self.communication.objective_status == 'red': # or (self.communication.objective_status == 'obd' and all([len(x) == 5 or len(x) == 3 for x in self.running_objective])):
+        #     # In case of 'obd' cases, the test expectation is not ready to handle unsatisfiable objectives
+        #     self.running_objective = self.communication.set_test_expectations(self.running_objective)
 
         for n in self.running_objective:
             if len(n) > 2:

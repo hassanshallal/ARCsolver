@@ -42,7 +42,7 @@ class Inductive:
             return
 
         # go cages and be careful or othwrwise yo'll screw it up
-        cages = Cages(self.communication, self.running_objective)
+        cages = Cages(self.communication)
         self.solved, mechanisms, this_testpred, self.running_objective = cages.screen_cages()
         if self.solved == 'solved':
             self.mechanisms.append(mechanisms)
@@ -50,7 +50,7 @@ class Inductive:
             return
 
         # try captured related, we will pass and recieve a modified running objective or none
-        captured = Captured(self.communication, self.running_objective, self.cur_test_preds)
+        captured = Captured(self.communication, self.cur_test_preds)
         self.solved, mechanisms,  this_test_pred, self.running_objective = captured.screen_captured()
         if self.solved == 'solved' or self.solved == 'partially solved':
             self.mechanisms.append(mechanisms)
