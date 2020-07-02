@@ -2,7 +2,9 @@
 from utils import *
 
 class Communication:
-    def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testinputs_vals, test_objective, testoutputs = None):
+    def __init__(self, is_similar_dim, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testinputs_vals, test_objective, testoutputs = None):
+        self.is_similar_dim = is_similar_dim
+        print('passed is_similar_dim:', self.is_similar_dim)
         self.traininputs = traininputs
         self.trainoutputs = trainoutputs
         self.testinputs = testinputs

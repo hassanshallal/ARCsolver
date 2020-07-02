@@ -35,12 +35,16 @@ class Inductive:
             self.cur_test_preds = this_testpred
             return
         # try flips related
+        print("didn't catch screen_dimesnions")
         self.solved, mechanisms, this_testpred = self.dimensionWork.screen_flips()
         if self.solved == 'solved':
             self.mechanisms.append(mechanisms)
             self.cur_test_preds = this_testpred
             return
-
+        print("didn't catch screen_flips")
+        print('objective: ', self.communication.objective)
+        print('objective_status: ', self.communication.objective_status)
+        print('running_objective: ', self.running_objective)
         # go cages and be careful or othwrwise yo'll screw it up
         cages = Cages(self.communication)
         self.solved, mechanisms, this_testpred, self.running_objective = cages.screen_cages()
@@ -48,7 +52,7 @@ class Inductive:
             self.mechanisms.append(mechanisms)
             self.cur_test_preds = this_testpred
             return
-
+        print("didn't catch screen_cages")
         # try captured related, we will pass and recieve a modified running objective or none
         captured = Captured(self.communication, self.cur_test_preds)
         self.solved, mechanisms,  this_test_pred, self.running_objective = captured.screen_captured()
@@ -56,6 +60,7 @@ class Inductive:
             self.mechanisms.append(mechanisms)
             self.cur_test_preds = this_test_pred
             return
+        print("didn't catch screen_captured")
 
         # try neighbored related, we will pass and recieve a modified running objective or none
         # neighbours = Neighbors(self.communication, self.running_objective, self.cur_test_preds)

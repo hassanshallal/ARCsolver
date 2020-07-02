@@ -219,7 +219,7 @@ class Captured:
             test_task_output_all.append(all_)
 
         return [test_task_output_ver_hor, test_task_output_diag, test_task_output_all]
-    
+
     def check_objective_against_captured(self, bg):
         copy_objective = deepcopy(self.running_objective)
         changed = False
@@ -376,7 +376,7 @@ class Captured:
     # ya the screen dimensions is a scary method, needs a lot of work now gets: 222, 268, 288, 306
     # screen dimensions
     def screen_captured(self): # This is abstract
-        if self.communication.objective_status == None and self.communication.is_unique_output != None: # and is used rather than or in order to prevent random capturing modules
+        if self.communication.objective_status == 'obd' and self.communication.is_unique_output != None: # and is used rather than or in order to prevent random capturing modules
             a = self.assess_captured_holistic_training()
             if self.captured_diff_dim_checks(a):
                 overall_cur_invest_num_unique, overall_cur_invest_unique = self.captured_diff_dim_signal_class(a)
@@ -385,7 +385,7 @@ class Captured:
             else:
                 return 'unsolved', [], self.cur_test_preds, None
 
-        else:
+        elif self.communication.is_similar_dim:
             is_solved = 'unsolved'
             mechanisms = []
             if type(self.communication.bg) == int:
@@ -405,6 +405,8 @@ class Captured:
                         is_solved = 'unsolved'
 
             return is_solved, mechanisms, self.cur_test_preds, self.running_objective
+        else:
+            return 'unsolved', [], self.cur_test_preds, self.running_objective
 
 # captured_astar(grid, x, y, bg, all_) # recursive done
 # captured_astar_util(arr, n, m, bg, all_), done

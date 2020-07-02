@@ -17,12 +17,15 @@ class Cages:
         copy_objective = deepcopy(self.running_objective)
         for n in range(len(copy_objective)):
             this_check = copy_objective[n]
+            this_check = this_check[0]
             if len(this_check) == 1:
-                copy_objective[n] = [this_check[0][0], this_check[0][1], 'direct']
+                print('len(this_check) == 1')
+                copy_objective[n][0] = [this_check[0][0], this_check[0][1], 'direct']
             elif len(this_check) == 2:
+                print('len(this_check) == 2')
                 if this_check[0][0] != this_check[1][0]:
-                    copy_objective[n][0] = [this_check[0][0], this_check[0][1], 'direct']
-                    copy_objective[n][1] = [this_check[1][0], this_check[1][1], 'direct']
+                    copy_objective[n][0][0] = [this_check[0][0], this_check[0][1], 'direct']
+                    copy_objective[n][0][1] = [this_check[1][0], this_check[1][1], 'direct']
         if is_list_of_list_of_list(copy_objective):
             return copy_objective[0]
         return copy_objective
@@ -95,7 +98,7 @@ class Cages:
                     return 'solved', ['cages', 'output_is_one_color'], this_output, self.running_objective
 
             # the next is direct transformation on tasks with no single bg and with known expected dimension: last in row
-            elif type(self.communication.bg) != int and self.communication.objective_status != 'irr':
+            elif type(self.communication.bg) != int and self.communication.is_similar_dim:
                 is_solved, mechanisms, this_output, this_running_objective = self.screen_direct_trnsformations()
                 if is_solved == 'solved':
                     return is_solved, mechanisms, this_output, this_running_objective

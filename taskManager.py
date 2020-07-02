@@ -93,16 +93,15 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.test_objective = self.set_test_expectations()
 
         # Dimension works
-        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.test_objective, self.testoutputs)
+        self.communication = Communication(self.is_similar_dim, self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.test_objective, self.testoutputs)
         self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
         self.dimension_status, self.output_dim_preds = self.dimensionWork.get_dimension_cognified()
 
         # induction
-        #self.inductive = Inductive(self.communication)
-        #self.inductive.inductive_strategy()
+        self.inductive = Inductive(self.communication)
+        self.inductive.inductive_strategy()
 
     # Methods
-
     def assess_bg_situation(self):
         traininputs_bg_set = set(self.traininputs_bg)
         if len(traininputs_bg_set) == 1:
