@@ -11,7 +11,7 @@ class Inductive:
         self.communication = communication
 
         # These are important and can be retrieved anytime
-        self.running_objective = deepcopy(self.communication.objective)
+        self.running_objective = deepcopy(self.communication.test_objective)
         self.cur_test_preds = deepcopy(self.communication.testinputs)
         self.solved, self.mechanisms = 'unsolved', []
 

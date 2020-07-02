@@ -208,7 +208,7 @@ def explore_dimensions(traininputs, trainoutputs):
 
     return is_similar_dim, input_dims, output_dims
 
-def get_value_map(in_, out_): # for cells that change
+def get_value_map(in_, out_, in_vals, out_vals): # for cells that change
     value_map = {}
     # we can't get a value map unless the shapes are equal
     if in_.shape == out_.shape:
@@ -217,6 +217,25 @@ def get_value_map(in_, out_): # for cells that change
             if in_[n[0], n[1]] not in value_map.keys():
                 value_map[in_[n[0], n[1]]] = set()
             value_map[in_[n[0], n[1]]].add(out_[n[0], n[1]])
+    else:
+        in_vals = set(in_vals)
+        out_vals = set(out_vals)
+        commons = list(in_vals.intersection(out_vals)) # k : {v}
+        in_extras = list(in_vals - out_vals)
+        out_extras = list(out_vals - in_vals)
+
+        for n in commons:
+            value_map[n] = set()
+            value_map[n].add(n)
+        if len(in_extras) > 0:
+            for n in in_extras:
+                value_map[n] = set()
+                for m in out_extras:
+                    value_map[n].add(m)
+        elif len(in_extras) == 0 and len(out_extras) > 0:
+            for m in out_extras:
+                value_map[-1] = set()
+                value_map[-1].add(m)
 
     return value_map
 
@@ -373,6 +392,7 @@ def get_col_to_token_test(final_test_nonbg, pr_tokens, bg, size_sorted_nonbg, in
     if type(bg) == int:
         final_test_nonbg = [x for x in final_test_nonbg if x != bg and x not in int_anchor_vals]
         col_to_token[bg] = 'bg'
+
     elif type(bg) == list:
         final_test_nonbg = [x for x in final_test_nonbg if x not in int_anchor_vals]
 
@@ -403,8 +423,14 @@ def get_problem_statement(col_to_token, couple_value_map):
     problem_statement = []
     for k, v in couple_value_map.items():
         value_list = sorted(list(v))
-        for n in value_list:
-            problem_statement.append((col_to_token[k], col_to_token[n]))
+        if len(value_list) > 0:
+            for n in value_list:
+                if k != -1:
+                    problem_statement.append((col_to_token[k], col_to_token[n]))
+                elif k == -1:
+                    problem_statement.append(('nil', col_to_token[n]))
+        elif len(value_list) == 0:
+            problem_statement.append((col_to_token[k], 'nil'))
 
     return sorted(problem_statement)
 
@@ -438,7 +464,8 @@ def is_same_nonbgs_per_couple(traininputs_vals, trainoutputs_vals, bg):
     return len_check
 
 def get_coordinates_of_tuple(x, in_, out_):
-    if type(in_) == list:
+
+    if type(in_) == list and len(in_) == len(out_) and len(in_[0]) == len(out_[0]):
         coordinates = []
         for n in range(len(in_)):
             this_in_ = in_[n]
@@ -446,8 +473,21 @@ def get_coordinates_of_tuple(x, in_, out_):
             target_indices = np.argwhere((this_in_ == x[0]) & (this_out_ == x[1]))
             coordinates.append(target_indices)
         return coordinates
-    else:
+
+    elif type(in_) == list and (len(in_) != len(out_) or len(in_[0]) != len(out_[0])):
+        coordinates = []
+        for n in range(len(in_)):
+            this_in_ = in_[n]
+            target_indices = (np.argwhere((this_in_ == x[0])), np.argwhere((this_in_ == x[0])))
+            coordinates.append(target_indices)
+        return coordinates
+
+    elif in_.shape[0] == out_.shape[0] and in_.shape[1] == out_.shape[1]:
         target_indices = np.argwhere((in_ == x[0]) & (out_ == x[1]))
+        return [target_indices]
+
+    elif in_.shape[0] != out_.shape[0] or in_.shape[1] != out_.shape[1]:
+        target_indices = (np.argwhere(in_ == x[0]), np.argwhere(out_ == x[1]))
         return [target_indices]
 
 def get_coordinates_from_arr(x, in_):
@@ -484,6 +524,12 @@ def retokenize(x, token_to_colors):
     if x[0] in token_to_colors.keys() and x[1] in token_to_colors.keys():
         if type(token_to_colors[x[0]]) == int and type(token_to_colors[x[1]]) == int:
             return(token_to_colors[x[0]], token_to_colors[x[1]])
+    elif x[0] == 'nil':
+        if type(token_to_colors[x[1]]) == int:
+            return(-1, token_to_colors[x[1]])
+    elif x[1] == 'nil':
+        if type(token_to_colors[x[0]]) == int:
+            return(token_to_colors[x[0]], -1)
     else:
         return ['Issue with retokenization.']
 
@@ -531,14 +577,21 @@ def get_set_of_values_1(this_dict):
     return values
 
 def get_this_objective(cur_graph):
+    cur_graph = sorted([x for x in cur_graph if type(x[0]) == str])
+
     combs = sorted(list(combinations(sorted(cur_graph), 2)))
     combs = [list(x) for x in combs if x[0][0] == x[1][0]]
     leveraged = set()
     for n in combs:
         leveraged.add(n[0])
         leveraged.add(n[1])
-    combs = [[x] for x in cur_graph if x not in leveraged and x[0] != x[1]] + combs
-    return combs
+
+    if len(leveraged) > 0:
+        return [[x] for x in cur_graph if x not in leveraged and x[0] != x[1]] + combs
+    elif len(leveraged) == 0:
+        return [cur_graph]
+
+    #return combs
 
 def create_an_objective_dict(objective):
     objective_dict = {}

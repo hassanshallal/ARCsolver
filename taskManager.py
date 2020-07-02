@@ -35,7 +35,7 @@ def confirmer(task):
         if managed_mod_task.inductive.solved != 'solved' and type(reference_task.bg) == int:
             managed_mod_task = TaskManager(modified_task, reference_task.bg)
         scope.append(managed_mod_task.inductive.solved)
-    #print(scope)
+
     return all([x == 'solved' for x in scope])
 
 class TaskManager: # works on a task by task level, there are checks and balances
@@ -47,7 +47,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         self.traininputs, self.trainoutputs = get_training(raw_task) # this will return two lists for inputs and outputs
         self.testinputs, self.testoutputs = get_testing(raw_task)
-        self.trainpreds, self.testpreds = deepcopy(self.traininputs), deepcopy(self.testinputs)
+        self.cur_train_preds, self.cur_test_preds = deepcopy(self.traininputs), deepcopy(self.testinputs)
 
         # gather general information about the dimensionality from training
         self.is_similar_dim, self.input_dims, self.output_dims = explore_dimensions(self.traininputs, self.trainoutputs)
@@ -55,30 +55,28 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.trainoutputs_vals = [np.unique(n).tolist() for n in self.trainoutputs]
         self.testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
 
-        self.couple_val_map = [get_value_map(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
-        #print('self.couple_val_map: ', self.couple_val_map)
+        self.couple_val_map = [get_value_map(n, m, x, y) for n, m, x, y in zip(self.traininputs, self.trainoutputs, self.traininputs_vals, self.trainoutputs_vals)]
         self.global_value_map = get_global_value_map(self.couple_val_map)
-        #print('self.global_value_map', self.global_value_map)
         self.couple_similars = [get_similars(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
         self.global_similars = get_global_value_map(self.couple_similars)
 
         # prepare relevant info for your tests conditionally on presence of testoutputs
         self.traininputs_bg = [get_background(n) for n in self.traininputs]
         self.testinputs_bg = [get_background(n) for n in self.testinputs]
+
         # assess bg and apply deductive routines to the task
         self.global_bg, self.bg = self.assess_bg_situation()
         if forced_bg != None:
             self.global_bg = True
             self.bg = forced_bg
 
+        # deductive
         self.deductive_coder0, self.deductive_coder1 = self.expose_deductive()
 
         # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
-
         all_test_input_vals = list(itertools.chain.from_iterable(self.testinputs_vals))
         self.priority_nonbg_input = sorted(list(get_common_nonbg(self.traininputs_vals)))
         self.priority_nonbg_input = [x for x in self.priority_nonbg_input if x in all_test_input_vals and x in self.global_value_map.keys()]
-
         self.priority_nonbg_output = sorted(list(get_common_nonbg(self.trainoutputs_vals)))
         list_global_value_map_values = list(itertools.chain.from_iterable(list(self.global_value_map.values())))
         self.priority_nonbg_output = [x for x in self.priority_nonbg_output if x in list_global_value_map_values]
@@ -90,16 +88,18 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.assignments_leads, self.int_anchor_vals, self.asssignments_output = self.generate_set_assignemtns()
         self.objective, self.objective_status = self.get_objectives()
 
-        # use above to tokenize the test and have a test_token_to_color_dict
         self.size_sorted_nonbg = self.get_size_sorted_nonbg()
         self.test_token_to_color = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
         self.test_objective = self.set_test_expectations()
 
+        # Dimension works
         self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.test_objective, self.testoutputs)
+        self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
+        self.dimension_status, self.output_dim_preds = self.dimensionWork.get_dimension_cognified()
 
         # induction
-        self.inductive = Inductive(self.communication)
-        self.inductive.inductive_strategy()
+        #self.inductive = Inductive(self.communication)
+        #self.inductive.inductive_strategy()
 
     # Methods
 
@@ -134,13 +134,15 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
     # This method tokenize a task based on training, it provides color_to_token, token_to_color, and problem_statements
     def tokenize(self):
-        if self.is_similar_dim:
-            color_to_tokens = [get_col_to_token(w, x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for w, x, y, z in zip(self.traininputs, self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
-            token_to_colors = [get_token_to_color(x) for x in color_to_tokens]
-            problem_statements = [get_problem_statement(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
-            return color_to_tokens, token_to_colors, problem_statements
-        else:
-            return {}, {}, []
+        #if self.is_similar_dim:
+        color_to_tokens = [get_col_to_token(w, x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for w, x, y, z in zip(self.traininputs, self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
+        token_to_colors = [get_token_to_color(x) for x in color_to_tokens]
+        problem_statements = [get_problem_statement(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
+        return color_to_tokens, token_to_colors, problem_statements
+        # else:
+        #     color_to_tokens = [get_col_to_token(w, x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for w, x, y, z in zip(self.traininputs, self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
+        #     token_to_colors = [get_token_to_color(x) for x in color_to_tokens]
+        #     return color_to_tokens, token_to_colors, []
 
     # steps to generate an objective from problem_statements (problem_statement --> problem_graph --> objective )
     def from_problem_statement_to_a_problem_graph(self, problem_statement, color_to_tokens, token_to_colors, couple_similar, traininput, trainoutput):
@@ -159,17 +161,14 @@ class TaskManager: # works on a task by task level, there are checks and balance
             return ['ARCsolver doesn can not express a problem graph yet.']
     def get_objectives(self):
         if type(self.problem_graph[0]) != str:
-            copy_problem_graph = []
-            for n in self.problem_graph:
-                copy_problem_graph.append(tuple(sorted([y for y in n if type(y[0]) == str])))
-
-            copy_problem_graph = sorted(list(set(copy_problem_graph)), key = len)
-            if len(copy_problem_graph) == 1 and self.global_bg:
-                return get_this_objective(copy_problem_graph[0]), 'obd' # one by default
-            elif len(copy_problem_graph) == 1 and not self.global_bg:
-                return [list(x) for x in copy_problem_graph], 'obd'
-
-            elif len(copy_problem_graph) > 1:
+            objectives = [get_this_objective(x) for x in self.problem_graph]
+            if all([x == objectives[0] for x in objectives]):
+                return objectives, 'obd'
+            else:
+                copy_problem_graph = []
+                for n in self.problem_graph:
+                    copy_problem_graph.append(tuple(sorted([y for y in n if type(y[0]) == str])))
+                copy_problem_graph = sorted(list(set(copy_problem_graph)), key = len)
                 current_boss = set()
                 for n in range(len(copy_problem_graph)-1):
                     if set(copy_problem_graph[n]).issubset(set(copy_problem_graph[n + 1])):
@@ -183,14 +182,12 @@ class TaskManager: # works on a task by task level, there are checks and balance
                     else:
                         current_boss = set()
                         break
+
                 current_boss = list(current_boss)
                 if len(current_boss) == 0:
-                    return copy_problem_graph, 'irr'# this is another level of difficulty I guess, irreducible
+                    return [], 'irr'# this is another level of difficulty I guess, irreducible
                 elif len(current_boss)  == 1:
-                    return get_this_objective(current_boss[0]), 'red' # we had a total reduction here, just account for variability
-                elif len(current_boss)  > 1 and len(current_boss) < len(self.problem_graph):
-                    return [get_this_objective(x) for x in current_boss], 'pred' # a case must have been a subset of another case for sure, partially reduced
-
+                    return objectives, 'red' # we had a total reduction here, just account for variability
         else:
             return ['ARCsolver can not generate an objective for this task yet.'], None
 
@@ -267,7 +264,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
     # The following are supposed to be generic, unfortunately  infer_on_mechanism is geared towards captured module
     def set_test_expectations(self):
         current_objective = deepcopy(self.objective)
-        if self.objective_status == 'obd' or self.objective_status == 'irr':
+        if self.objective_status == 'obd':
+            return current_objective[0]
+        elif self.objective_status == 'irr':
             return current_objective
 
         elif self.objective_status == 'red' or self.objective_status == 'pred':
@@ -275,12 +274,9 @@ class TaskManager: # works on a task by task level, there are checks and balance
             test_token_to_color = deepcopy(self.test_token_to_color)
 
             if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
-                print('b')
                 del test_token_to_color['bg']
 
             if len(test_token_to_color) > len(bare_assignemnt_leads):
-                print('******** setting_test_expectaion_expansion **********')
-                print('c')
                 diff = list(set(test_token_to_color.keys()) - bare_assignemnt_leads)
                 for n in diff:
                     if self.test_token_to_color[n] in list(itertools.chain.from_iterable(self.testinputs_vals)):
@@ -289,13 +285,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 return current_objective
 
             if len(test_token_to_color) < len(bare_assignemnt_leads):
-                print('******** setting_test_expectaion_contraction **********')
-                print('d')
                 new_objective = []
-                for n in current_objective:
-                    if len(n) == 3 and n[0] in test_token_to_color.keys():
-                        new_objective.append(n)
-
                 target = set(test_token_to_color.keys())
                 for n in list(target):
                     is_found_obj = find_target_obj(current_objective, n)
