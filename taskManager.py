@@ -1,18 +1,8 @@
 # Be subtle and abstract
 from utils import *
 from communicate import *
-from inductive import *
+from inductive_core_knowledge import *
 
-# forced_bg is used in reconfirmation on unconfirmed cases as a backup way to confirm we got the right thing
-# This is the first time we design in a human way, this is how the system actually can manage some ambiguity
-# both tasks [293, 338] failed initial reconfirmation and when we forced a bg of 0, we managed to get them to be
-# reconfirmed, we made changes in the cages that don't work with the on-th-fly data in communication, this is a trap
-# and we should probably solve it.
-
-# With this development, we we able to solve the reconfirmation problem in a human manner. The system is
-# quite sensitive to the bg and we need to figure out whether we should probably take the bg in the test
-# in consideration and do some consensus when we have a list bg with a mode or something. We scored only two
-# on the evaluaton but it is interesting we initiated like 48 task, very nice.
 
 def flip_test_train(task, num):
     modified_task = deepcopy(task)
@@ -85,6 +75,8 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         # problem description
         self.problem_graph = self.express_problem_graph()
+
+
         self.assignments_leads, self.int_anchor_vals, self.asssignments_output = self.generate_set_assignemtns()
         self.objective, self.objective_status = self.get_objectives()
 
@@ -93,13 +85,15 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.test_objective = self.set_test_expectations()
 
         # Dimension works
-        self.communication = Communication(self.is_similar_dim, self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.test_objective, self.testoutputs)
+        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.test_objective, self.testoutputs)
+
         self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
         self.dimension_status, self.output_dim_preds = self.dimensionWork.get_dimension_cognified()
 
-        # induction
-        self.inductive = Inductive(self.communication)
-        self.inductive.inductive_strategy()
+
+        # # induction
+        # self.inductive = Inductive(self.communication)
+        # self.inductive.inductive_strategy()
 
     # Methods
     def assess_bg_situation(self):
@@ -112,6 +106,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
             global_bg = False
             bg = self.traininputs_bg
         return global_bg, bg
+
     def expose_deductive(self):
         if self.is_similar_dim and type(self.bg) == int:
             situation  = [process_diff(n, m, self.bg) for n, m in zip(self.traininputs, self.trainoutputs)]
@@ -133,15 +128,10 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
     # This method tokenize a task based on training, it provides color_to_token, token_to_color, and problem_statements
     def tokenize(self):
-        #if self.is_similar_dim:
         color_to_tokens = [get_col_to_token(w, x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for w, x, y, z in zip(self.traininputs, self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
         token_to_colors = [get_token_to_color(x) for x in color_to_tokens]
         problem_statements = [get_problem_statement(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
         return color_to_tokens, token_to_colors, problem_statements
-        # else:
-        #     color_to_tokens = [get_col_to_token(w, x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for w, x, y, z in zip(self.traininputs, self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
-        #     token_to_colors = [get_token_to_color(x) for x in color_to_tokens]
-        #     return color_to_tokens, token_to_colors, []
 
     # steps to generate an objective from problem_statements (problem_statement --> problem_graph --> objective )
     def from_problem_statement_to_a_problem_graph(self, problem_statement, color_to_tokens, token_to_colors, couple_similar, traininput, trainoutput):
@@ -153,11 +143,13 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 if n in traininput and n in trainoutput:
                     problem_graph.append((n, n)) # this could be a relevant anchor nonbg
         return problem_graph
+
     def express_problem_graph(self):
         if len(self.problem_statements) > 0 and type(self.problem_statements[0]) == list:
             return [self.from_problem_statement_to_a_problem_graph(problem_statement, color_to_tokens, token_to_colors, couple_similar, traininput, trainoutput) for problem_statement, color_to_tokens, token_to_colors, couple_similar, traininput, trainoutput in zip(self.problem_statements, self.color_to_tokens, self.token_to_colors, self.couple_similars, self.traininputs, self.trainoutputs)]
         else:
             return ['ARCsolver doesn can not express a problem graph yet.']
+
     def get_objectives(self):
         if type(self.problem_graph[0]) != str:
             objectives = [get_this_objective(x) for x in self.problem_graph]
@@ -268,7 +260,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
         elif self.objective_status == 'irr':
             return current_objective
 
-        elif self.objective_status == 'red' or self.objective_status == 'pred':
+        elif self.objective_status == 'red':
             bare_assignemnt_leads = get_bare_assignment_leads(self.assignments_leads)
             test_token_to_color = deepcopy(self.test_token_to_color)
 

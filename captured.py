@@ -227,24 +227,24 @@ class Captured:
             changed = True
             copy_objective = [copy_objective]
         for x in range(len(copy_objective)):
-            print('x from within: ', x, ', working on: ', copy_objective[x])
+            #print('x from within: ', x, ', working on: ', copy_objective[x])
             for n in range(len(copy_objective[x])):
-                print('n from within: ', n, ', working on: ', copy_objective[x][n])
+                #print('n from within: ', n, ', working on: ', copy_objective[x][n])
                 this_check = copy_objective[x][n]
                 if len(this_check) == 1:
                     copy_objective[x][n] = [this_check[0][0], this_check[0][1], 'direct']
                 elif len(this_check) == 2:
-                    print('entered_to_process_0')
+                    #print('entered_to_process_0')
                     first_target_coords = retrieve_coords_from_assignments(this_check[0], self.communication.asssignments_output)
                     second_target_coords = retrieve_coords_from_assignments(this_check[1], self.communication.asssignments_output)
-                    print(len(first_target_coords), len(second_target_coords))
+                    #print(len(first_target_coords), len(second_target_coords))
                     if len(first_target_coords) == len(second_target_coords) and len(first_target_coords) > 0:
-                        print('entered_to_process_1: ')
+                        #print('entered_to_process_1: ')
                         for m in range(len(first_target_coords)):
                             first_target_result = self.captured_situation_target(self.communication.traininputs[m], first_target_coords[m], bg)
                             second_target_result = self.captured_situation_target(self.communication.traininputs[m], second_target_coords[m], bg)
                             comparison = [x != y  for x, y in zip(first_target_result, second_target_result)]
-                            print('comparison: ', comparison)
+                            #print('comparison: ', comparison)
                             if comparison[2]:
                                 if first_target_result[2] and not second_target_result[2]:
                                     cap = (this_check[0])

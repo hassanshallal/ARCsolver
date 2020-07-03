@@ -71,3 +71,66 @@ class Inductive:
         #     return
 
         return
+
+    # creating output with objectives
+    def objectively_build_a_prediction(self, change_tuple, coordinates, cur_test_pred):
+        assert(len(coordinates) == len(cur_test_pred))
+
+        # this is to cover colors to only show in the output and to get it from the training!
+        # We tokenized testinputs based on the traininputs
+        if change_tuple[1] not in self.test_token_to_color.keys():
+            for x in self.token_to_colors:
+                for k, v in x.items():
+                    if change_tuple[1] == k:
+                        self.test_token_to_color[change_tuple[1]] = v
+
+        for n in range(len(coordinates)):
+            these_coords = coordinates[n]
+            for m in these_coords:
+                coord = m[1]
+                cur = cur_test_pred[n][coord[0]][coord[1]]
+                if change_tuple[0] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
+                    cur_test_pred[n][coord[0]][coord[1]] = self.test_token_to_color[change_tuple[1]]
+        return cur_test_pred
+
+    # this method direct transform without reference to coordinates
+    def apply_direct_transformation(self, change_tuple, cur_test_pred):
+        for x in range(len(cur_test_pred)):
+            for n in range(cur_test_pred[x].shape[0]):
+                for m in range(cur_test_pred[x].shape[1]):
+                    cur = cur_test_pred[x][n][m]
+                    if change_tuple[0] in self.test_token_to_color.keys() and change_tuple[1] in self.test_token_to_color.keys() and cur == self.test_token_to_color[change_tuple[0]]:
+                        cur_test_pred[x][n][m] = self.test_token_to_color[change_tuple[1]]
+        return cur_test_pred
+
+    # Creating and populating output in cases with no objective:
+    def build_a_prediction(self, dimension_status, reference, **kwargs):
+        if dimension_status == 'deduced':
+            for k, v in kwargs.items():
+                if k == 'add_to_zero':
+                    cur_output = np.zeros(reference) # reference is dimensions
+                    cur_output += v
+                    cur_output = cur_output.astype(int)
+                    return [y.tolist() for y in cur_output]
+                elif k == 'direct_transform':
+                    cur_output = reference # reference is a testinput array
+                    this_objective_dict = create_an_objective_dict(self.objective)
+                    for token, coords in v.items():
+                        for coord in coords:
+                            cur_output[coord[0], coord[1]] = self.test_token_to_color[this_objective_dict[token]]
+                    return [y.tolist() for y in cur_output]
+        return None
+
+    # Transfer cargo
+    def carry_along_args(self, *args):
+        self.args = args
+        return
+
+    def carry_along_kwargs(self, **kwargs):
+        for k, v in kwargs.items():
+            if k == 'dimension_status':
+                self.dimension_status = v
+            if k == 'output_dim_preds':
+                self.output_dim_preds = v
+
+        return
