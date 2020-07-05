@@ -81,11 +81,11 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.objective, self.objective_status = self.get_objectives()
 
         self.size_sorted_nonbg = self.get_size_sorted_nonbg()
-        self.test_token_to_color = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
+        self.test_token_to_colors = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
         self.test_objective = self.set_test_expectations()
 
         # Dimension works
-        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_color, self.testinputs_vals, self.test_objective, self.testoutputs)
+        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_colors, self.testinputs_vals, self.test_objective, self.testoutputs)
 
         self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
         self.dimension_status, self.output_dim_preds = self.dimensionWork.get_dimension_cognified()
@@ -152,7 +152,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
     def get_objectives(self):
         if type(self.problem_graph[0]) != str:
-            objectives = [get_this_objective(x) for x in self.problem_graph]
+            objectives = [get_this_objective(x, self.assignments_leads, self.is_similar_dim) for x in self.problem_graph]
             if all([x == objectives[0] for x in objectives]):
                 return objectives, 'obd'
             else:
@@ -176,7 +176,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
                 current_boss = list(current_boss)
                 if len(current_boss) == 0:
-                    return [], 'irr'# this is another level of difficulty I guess, irreducible
+                    return objectives, 'irr'# this is another level of difficulty I guess, irreducible
                 elif len(current_boss)  == 1:
                     return objectives, 'red' # we had a total reduction here, just account for variability
         else:
@@ -241,48 +241,62 @@ class TaskManager: # works on a task by task level, there are checks and balance
         return modified_combs
 
     def get_test_token_to_color(self):
+        test_token_to_colors = []
         if len(self.token_to_colors) > 0:
             if all([x == self.token_to_colors[0] for x in self.token_to_colors]):
-                return self.token_to_colors[0]
+                for n in range(len(self.testinputs)):
+                    test_token_to_colors.append(self.token_to_colors[0])
+
             else:
                 pr_tokens = get_priority_token(self.token_to_colors)
                 testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
                 final_test_nonbg = sorted(list(get_common_nonbg(testinputs_vals)))
-                test_color_to_token = get_col_to_token_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[0])
-                return get_token_to_color(test_color_to_token)
+                for n in range(len(self.testinputs)):
+                    this_test_color_to_token = get_col_to_token_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[n])
+                    test_token_to_colors.append(get_token_to_color(this_test_color_to_token))
 
+        return test_token_to_colors
 
     # The following are supposed to be generic, unfortunately  infer_on_mechanism is geared towards captured module
     def set_test_expectations(self):
         current_objective = deepcopy(self.objective)
+
+        test_objectives = []
+
         if self.objective_status == 'obd':
-            return current_objective[0]
-        elif self.objective_status == 'irr':
-            return current_objective
+            for n in range(len(self.testinputs)):
+                test_objectives.append(current_objective[0])
 
-        elif self.objective_status == 'red':
-            bare_assignemnt_leads = get_bare_assignment_leads(self.assignments_leads)
-            test_token_to_color = deepcopy(self.test_token_to_color)
+        else:
+            train_dicts = deepcopy(self.token_to_colors)
+            test_dicts = deepcopy(self.test_token_to_colors)
 
-            if is_all_nonbg_in_cur_obj(current_objective) and 'bg' in test_token_to_color.keys():
-                del test_token_to_color['bg']
+            train_dicts_keys = [set(x.keys()) for x in train_dicts]
+            test_dicts_keys = [set(x.keys()) for x in test_dicts]
 
-            if len(test_token_to_color) > len(bare_assignemnt_leads):
-                diff = list(set(test_token_to_color.keys()) - bare_assignemnt_leads)
-                for n in diff:
-                    if self.test_token_to_color[n] in list(itertools.chain.from_iterable(self.testinputs_vals)):
-                        this_extra = expand_obj(deepcopy(current_objective[0]), n)
-                        current_objective.append(this_extra)
-                return current_objective
+            for test in test_dicts_keys:
+                match_screen = [x == test for x in train_dicts_keys]
+                chekpoint = None
+                if any(match_screen):
+                    which_ind = match_screen.index(True)
+                    test_objectives.append(deepcopy(self.objective[which_ind]))
+                    chekpoint = 0
 
-            if len(test_token_to_color) < len(bare_assignemnt_leads):
-                new_objective = []
-                target = set(test_token_to_color.keys())
-                for n in list(target):
-                    is_found_obj = find_target_obj(current_objective, n)
-                    if is_found_obj != None:
-                        new_objective.append(is_found_obj)
+                if chekpoint == None:
+                    intersections = [len(x.intersection(test)) for x in train_dicts_keys]
 
-                return new_objective
+                    most_intersection_index = intersections.index(max(intersections))
+                    to_modify_objective = deepcopy(self.objective[most_intersection_index])
+                    # we wither add or remove from the to_modify_objective:
+                    dict_to_compare_with = set(self.token_to_colors[most_intersection_index].keys())
+                    if len(test) > len(dict_to_compare_with):
+                        diff = test - dict_to_compare_with
+                        for diff_element in diff:
+                            to_modify_objective = expand_obj(to_modify_objective, diff_element)
+                    elif len(test) < len(dict_to_compare_with):
+                        diff = dict_to_compare_with - test
+                        for diff_element in diff:
+                            to_modify_objective = contract_obj(to_modify_objective, diff_element)
+                    test_objectives.append(to_modify_objective)
 
-            return current_objective # this is a more difficult case where we need to really convolve more cognition
+        return test_objectives

@@ -576,22 +576,68 @@ def get_set_of_values_1(this_dict):
         values.add(target[n][0])
     return values
 
-def get_this_objective(cur_graph):
-    cur_graph = sorted([x for x in cur_graph if type(x[0]) == str])
+def get_this_objective(cur_graph, assignments_leads, is_similar_dimension):
+    cur_graph = sorted([x for x in cur_graph if type(x[0]) == str or (type(x[0]) == tuple and type(x[0][0]) == str)])
+    graph_similars = [x for x in cur_graph if x[0] == x[1]]
+    graph_diffs = [x for x in cur_graph if x[0] != x[1]]
 
-    combs = sorted(list(combinations(sorted(cur_graph), 2)))
-    combs = [list(x) for x in combs if x[0][0] == x[1][0]]
-    leveraged = set()
-    for n in combs:
-        leveraged.add(n[0])
-        leveraged.add(n[1])
+    bare_assignment_leads = get_bare_assignment_leads(assignments_leads)
 
-    if len(leveraged) > 0:
-        return [[x] for x in cur_graph if x not in leveraged and x[0] != x[1]] + combs
-    elif len(leveraged) == 0:
-        return [cur_graph]
+    desired_combs = []
+    if len(bare_assignment_leads) > 0 and is_similar_dimension:
+        for n in sorted(list(bare_assignment_leads)):
+            this_n_similars = [x for x in graph_similars if x[0] == n]
+            this_n_diffs = [x for x in graph_diffs if x[0] == n]
+            if len(this_n_similars) > 0 and len(this_n_diffs) > 0:
+                this_n = this_n_similars + this_n_diffs
+                if len(this_n) == 2:
+                    nl = []
+                    nl.append(this_n[0])
+                    nl.append(this_n[1])
+                    desired_combs.append(nl)
+                elif len(this_n) > 2:
+                    this_n_combs = sorted(list(combinations(sorted(this_n), 2)))
+                    for x in this_n_combs:
+                        nl = []
+                        nl.append(x[0])
+                        nl.append(x[1])
+                        desired_combs.append(nl)
+            elif len(this_n_similars) == 0 and len(this_n_diffs) == 1:
+                for x in this_n_diffs:
+                    y = (x[0], x[1], 'direct')
+                    nl = []
+                    nl.append(y)
+                    desired_combs.append(nl)
+            elif len(this_n_similars) == 0 and len(this_n_diffs) > 1:
+                this_n_combs = sorted(list(combinations(sorted(this_n_diffs), 2)))
+                for x in this_n_combs:
+                    nl = []
+                    nl.append(x[0])
+                    nl.append(x[1])
+                    desired_combs.append(nl)
+            elif len(this_n_similars) > 0 and len(this_n_diffs) == 0:
+                for x in this_n_similars:
+                    y = (x[0], x[1], 'direct')
+                    nl = []
+                    nl.append(y)
+                    desired_combs.append(nl)
 
-    #return combs
+    elif len(bare_assignment_leads) == 0 or not is_similar_dimension:
+        if len(graph_diffs) > 0:
+            for x in graph_diffs:
+                y = (x[0], x[1], 'direct')
+                nl = []
+                nl.append(y)
+                desired_combs.append(nl)
+
+        if len(graph_similars) > 0:
+            for x in graph_similars:
+                y = (x[0], x[1], 'direct')
+                nl = []
+                nl.append(y)
+                desired_combs.append(nl)
+
+    return sorted(desired_combs, key = len)
 
 def create_an_objective_dict(objective):
     objective_dict = {}
@@ -667,23 +713,48 @@ def get_bare_assignment_leads(assignments_leads):
     return bare_assignment_leads
 
 def expand_obj(objective, diff_element):
+    to_add = []
+    this_index = None
     for n in range(len(objective)):
-        if type(objective[n]) == tuple and 'nonbg' in objective[n][0]:
-            if objective[n][0] != objective[n][1]:
-                carry = objective[n][1]
-            else:
-                carry = diff_element
-            objective[n] = (diff_element, carry)
-    return objective
+        x = objective[n] # x:  [('nonbg1', 'nonbg1'), ('nonbg1', 'bg')]
+        if len(x) == 2:
+            if 'nonbg' in x[0][0] and 'pr' not in x[0][0]:
+                this_index = n
+                break
 
-def find_target_obj(Current_objective, target_element):
-    for n in range(len(Current_objective)):
-        objective = deepcopy(Current_objective[n])
-        for n in range(len(objective)):
-            if type(objective[n]) == tuple and objective[n][0] == target_element:
-                return objective
-    return None
+    if this_index != None:
+        x = objective[this_index]
+        if x[0][0] != x[0][1]:
+            carry = x[0][1]
+        else:
+            carry = diff_element
+        to_add = [(diff_element, carry)]
 
+        if x[1][0] != x[1][1]:
+            carry = x[1][1]
+        else:
+            carry = diff_element
+        to_add.append((diff_element, carry))
+        objective.append(to_add)
+
+    return sorted(objective)
+
+def contract_obj(objective, diff_element):
+    to_add = []
+    indices_to_remove = []
+    for n in range(len(objective)):
+        x = objective[n]
+        if len(x) <= 2 and type(x[0]) == tuple and x[0][0] == diff_element:
+            indices_to_remove.append(n)
+
+    new_objective = []
+    if len(indices_to_remove) > 0:
+        for check_ind in range(len(objective)):
+            if check_ind not in indices_to_remove:
+                new_objective.append(objective[check_ind])
+
+    return sorted(new_objective)
+    
 def retrieve_coords_from_assignments(target_tuple, asssignments_output):
     results = []
     for n in range(len(asssignments_output)): # len num_train
