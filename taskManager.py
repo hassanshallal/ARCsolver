@@ -82,6 +82,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         self.size_sorted_nonbg = self.get_size_sorted_nonbg()
         self.test_token_to_colors = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
+        self.test_color_to_tokens = [get_token_to_color(x) for x in self.test_token_to_colors]
         self.test_objective = self.set_test_expectations()
 
         # Dimension works
