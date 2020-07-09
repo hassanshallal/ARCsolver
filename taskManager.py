@@ -2,6 +2,8 @@
 from utils import *
 from communicate import *
 from inductive_core_knowledge import *
+from edges import *
+from neighbors import *
 
 
 def flip_test_train(task, num):
