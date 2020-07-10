@@ -342,7 +342,7 @@ def get_size_sorted_nonbg_vals_test(remaining_test_nonbg, testinput):
     modified_combs = set()
     for n in remaining_test_nonbg:
         modified_combs.add((n, np.count_nonzero(testinput == n)))
-    modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1]) 
+    modified_combs = sorted(list(modified_combs), key=lambda tup: tup[1])
     modified_combs = [x[0] for x in modified_combs]
     return modified_combs
 

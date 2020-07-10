@@ -1,9 +1,9 @@
 # Be subtle and abstract
 from utils import *
-from communicate import *
-from inductive_core_knowledge import *
-from edges import *
-from neighbors import *
+# from communicate import *
+# from inductive_core_knowledge import *
+# from edges import *
+# from neighbors import *
 
 
 def flip_test_train(task, num):
@@ -86,17 +86,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.test_token_to_colors = self.get_test_token_to_color() # work out your self.test_token_to_color: 227, 328 are example of a blind spot of this system with 'direct' strategy
         self.test_color_to_tokens = [get_token_to_color(x) for x in self.test_token_to_colors]
         self.test_objective = self.set_test_expectations()
-
-        # Dimension works
-        self.communication = Communication(self.traininputs, self.trainoutputs, self.testinputs, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_colors, self.testinputs_vals, self.test_objective, self.testoutputs)
-
-        self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
-        self.dimension_status, self.output_dim_preds = self.dimensionWork.get_dimension_cognified()
-
-
-        # # induction
-        # self.inductive = Inductive(self.communication)
-        # self.inductive.inductive_strategy()
 
     # Methods
     def assess_bg_situation(self):

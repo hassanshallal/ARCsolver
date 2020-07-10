@@ -2,10 +2,10 @@
 from utils import *
 
 class Communication:
-    def __init__(self, traininputs, trainoutputs, testinputs, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testinputs_vals, test_objective, testoutputs = None):
-        self.traininputs = traininputs
+    def __init__(self, cur_train_preds, trainoutputs, cur_test_preds, bg, objective_status, objective, assignments_leads, asssignments_output, token_to_colors, test_token_to_color, testinputs_vals, test_objective, testoutputs = None):
+        self.cur_train_preds = cur_train_preds
         self.trainoutputs = trainoutputs
-        self.testinputs = testinputs
+        self.cur_test_preds = cur_test_preds
         self.bg = bg
 
         self.objective_status = objective_status
@@ -20,10 +20,10 @@ class Communication:
 
         # The following data members are added along the way and used by other modules
         self.is_unique_output = self.find_unique_output()
-        self.freq_nonbg_traininputs = self.get_freq_nonbg_inputs(self.traininputs) # just the number of nonbg: utilized only in dimensionWork
-        self.freq_nonbg_testinputs = self.get_freq_nonbg_inputs(self.testinputs) # just the number of nonbg: utilized only in dimensionWork
-        self.frequency_counter_traininputs = [Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in self.traininputs]
-        self.frequency_counter_testinputs = [Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in self.testinputs]
+        self.freq_nonbg_traininputs = self.get_freq_nonbg_inputs(self.cur_train_preds) # just the number of nonbg: utilized only in dimensionWork
+        self.freq_nonbg_testinputs = self.get_freq_nonbg_inputs(self.cur_test_preds) # just the number of nonbg: utilized only in dimensionWork
+        self.frequency_counter_traininputs = [Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in self.cur_train_preds]
+        self.frequency_counter_testinputs = [Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in self.cur_test_preds]
 
 
     # Hyperparameters for inductive or any of its modules can be passed here
