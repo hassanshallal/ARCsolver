@@ -208,5 +208,4 @@ def sets_obj_on_train(cur_x_train, cur_y_train, this_objective):
             target_columns = obj[2]
             for opp in target_columns:
                 obj.append((opp, sets_dict[obj[0]][opp-1], sets_dict[obj[1]][opp-1]))
-
     return objective

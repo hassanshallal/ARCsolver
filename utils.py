@@ -804,4 +804,4 @@ def screen_flips_rotation(in_, out_):
     elif np.all(np.fliplr(in_) == np.array(out_)):
         return np.fliplr, None
     else:
-        return False, None
+        return None, None

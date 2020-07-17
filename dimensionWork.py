@@ -172,16 +172,18 @@ class DimensionWork:
 
 
         are_flips = [screen_flips_rotation(in_, out_) for in_, out_ in zip(train_situation, self.communication.trainoutputs)]
-        is_all_situation_on_train = all([x[0] != False for x in are_flips]) and all([x[0] == are_flips[0][0] for x in are_flips])
-        is_any_situation_on_train = any([x[0] != False for x in are_flips]) and any([x[0] == are_flips[0][0] for x in are_flips])
+        is_all_situation_on_train = all([x[0] != None for x in are_flips]) and all([x[0] == are_flips[0][0] for x in are_flips])
+        is_any_situation_on_train = any([x[0] != None for x in are_flips]) and any([x[0] == are_flips[0][0] for x in are_flips])
         if is_all_situation_on_train:
             current_situation = 'passed_all_traininputs'
-            train_situation = [are_flips[0][0](x, are_flips[0][1]) for x in train_situation]
-            train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.communication.trainoutputs)]
 
             if are_flips[0][1] != None:
+                train_situation = [are_flips[0][0](x, are_flips[0][1]) for x in train_situation]
+                train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.communication.trainoutputs)]
                 test_situation = [are_flips[0][0](x, are_flips[0][1]) for x in test_situation]
             else:
+                train_situation = [are_flips[0][0](x) for x in train_situation]
+                train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.communication.trainoutputs)]
                 test_situation = [are_flips[0][0](x) for x in test_situation]
 
             if len(self.communication.testoutputs) == len(self.communication.cur_test_preds):

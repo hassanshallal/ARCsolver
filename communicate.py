@@ -50,3 +50,37 @@ class Communication:
             return [np.sum(x != self.bg) for x in lists]
         elif type(self.bg) == list:
             return [np.sum(x != y) for x, y in zip(lists, self.bg)]
+
+
+    def build_a_prediction(self, dimension_status, reference, **kwargs):
+        if dimension_status == 'deduced':
+            for k, v in kwargs.items():
+                if k == 'add_to_zero':
+                    cur_output = np.zeros(reference) # reference is dimensions
+                    cur_output += v
+                    cur_output = cur_output.astype(int)
+                    return [y.tolist() for y in cur_output]
+                elif k == 'direct_transform':
+                    cur_output = reference # reference is a testinput array
+                    this_objective_dict = create_an_objective_dict(self.objective)
+                    for token, coords in v.items():
+                        for coord in coords:
+                            cur_output[coord[0], coord[1]] = self.test_token_to_color[this_objective_dict[token]]
+                    return [y.tolist() for y in cur_output]
+        return None
+
+     # Transfer cargo
+    def carry_along_args(self, *args):
+        self.args = args
+        return
+
+    def carry_along_kwargs(self, **kwargs):
+        for k, v in kwargs.items():
+            if k == 'dimension_status':
+                self.dimension_status = v
+            if k == 'output_dim_preds':
+                self.output_dim_preds = v
+            if k == 'is_similar_dim':
+                self.is_similar_dim = v
+
+        return
