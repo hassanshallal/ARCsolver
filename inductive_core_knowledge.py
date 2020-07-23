@@ -84,34 +84,42 @@ class Inductive(TaskManager):
             bg_test = [get_background(x) for x in self.testinputs]
 
         # second gather prior knowledge
-        train_inputs = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.traininputs, bg_train, self.color_to_tokens)]
-        test_inputs = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.testinputs, bg_test, self.test_color_to_tokens)]
+        train_inputs = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_train_preds, bg_train, self.color_to_tokens)]
+        test_inputs = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_test_preds, bg_test, self.test_color_to_tokens)]
         train_outputs = [apply_transform_map(x, y) for x, y in zip(self.trainoutputs, self.color_to_tokens)]
 
-        # Third: featurize
-        x_train = []
-        y_train = []
-        for x, y in zip(train_inputs, train_outputs):
-            features, target = featurize_prior_knowledge_train(x, y)
-            x_train.append(features)
-            y_train.append(target)
-        x_test =  [featurize_prior_knowledge_test(x) for x in test_inputs]
+        if all([x.shape[1] == y.shape[0] and x.shape[2] == y.shape[1] for x, y in zip(train_inputs, train_outputs)]):
+            # Third: featurize
+            x_train = []
+            y_train = []
+            for x, y in zip(train_inputs, train_outputs):
+                features, target = featurize_prior_knowledge_train(x, y)
+                x_train.append(features)
+                y_train.append(target)
+            x_test =  [featurize_prior_knowledge_test(x) for x in test_inputs]
 
-        # Fifth: stack cases
-        cur_x_train = x_train[0]
-        for n in range(1, len(x_train)):
-            cur_x_train = np.vstack((cur_x_train, x_train[n]))
 
-        # Fourth: find your task classes, codify them
-        cur_y_train = y_train[0]
-        for n in range(1, len(y_train)):
-            cur_y_train = np.hstack((cur_y_train, y_train[n]))
+            # Fourth: stack train cases
+            cur_x_train = x_train[0]
+            for n in range(1, len(x_train)):
+                cur_x_train = np.vstack((cur_x_train, x_train[n]))
 
-        cur_x_test = x_test[0]
-        for n in range(1, len(x_test)):
-            cur_x_test = np.vstack((cur_x_test, x_test[n]))
+            # Fifth: find your task classes, codify them
+            cur_y_train = y_train[0]
+            for n in range(1, len(y_train)):
+                cur_y_train = np.hstack((cur_y_train, y_train[n]))
 
-        return cur_x_train, cur_y_train, cur_x_test
+            # Fourth: stack testcases
+            cur_x_test = x_test[0]
+            for n in range(1, len(x_test)):
+                cur_x_test = np.vstack((cur_x_test, x_test[n]))
+
+            return cur_x_train, cur_y_train, cur_x_test
+        else:
+            return train_inputs, train_outputs, test_inputs
+
+
+
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop

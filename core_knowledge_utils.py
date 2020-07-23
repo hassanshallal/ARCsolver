@@ -154,6 +154,8 @@ def build_prior_knowledge(in_, bg, color_to_token):
 
 def featurize_prior_knowledge_train(in_p_k, tokenized_target_arr):
     #print(tokenized_target_arr)
+    # print(in_p_k.shape)
+    # print(tokenized_target_arr.shape)
     x = []
     y = []
     dim_0 = in_p_k.shape[1]
