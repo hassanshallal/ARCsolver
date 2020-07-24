@@ -16,12 +16,15 @@ class Inductive(TaskManager):
         self.communication.carry_along_kwargs(output_dim_preds = self.output_dim_preds)
         self.communication.carry_along_kwargs(is_similar_dim = self.is_similar_dim)
 
-        self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map))]
-        self.apply_routine_list = [('apply_value_maps', apply_value_maps), ('apply_direct_transformation', apply_direct_transformation)]
+        # second gather prior knowledge
+        self.traininputs_prkn, self.testinputs_prkn, self.trainoutputs_tokenized  = self.get_prior_knowledge()
 
-        if self.is_similar_dim:
-            self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_features()
-            self.running_objective = [sets_obj_on_train(self.cur_x_train, self.cur_y_train, objec) for objec in self.objective]
+        # if self.is_similar_dim:
+        self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_features()
+        self.running_objective = [sets_obj_on_train(self.cur_x_train, self.cur_y_train, objec) for objec in self.objective]
+
+        self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips())]
+        self.apply_routine_list = [('apply_value_maps', apply_value_maps), ('apply_direct_transformation', apply_direct_transformation), ('apply_flips', screen_flips_rotation)]
 
         self.solved, self.mechanisms = 'unsolved', []
         self.current_situation, self.train_situation, self.train_screen, self.test_situation, self.test_screen = 'ineligible', [], [], [], []
@@ -30,6 +33,7 @@ class Inductive(TaskManager):
     def try_apply_routines(self, what_to_try, apply_routine):
         current_situation = 'screening ' + what_to_try
         train_situation = deepcopy(self.cur_train_preds)
+        train_options = [(None, None)] * len(train_situation)
         train_screen = [False] * len(train_situation)
         test_situation = deepcopy(self.cur_test_preds)
         test_screen = ['nil'] * len(test_situation) # we always assume we don't have testoutputs and hence we can't compare
@@ -45,7 +49,15 @@ class Inductive(TaskManager):
             train_situation = [apply_routine(x, self.global_value_map) for x in train_situation]
         elif what_to_try == 'apply_direct_transformation':
             train_situation = [apply_routine(w, x, y, z) for w, x, y, z in zip(train_situation, color_to_tokens, objective, token_to_colors)]
+        elif what_to_try == 'apply_flips':
+            train_options = [apply_routine(x, y) for x, y in zip(train_situation, self.trainoutputs)]
+            #print(train_options)
+            if all([x != (None, None) and x == train_options[0] for x in train_options]):
 
+                if train_options[0][1] == None:
+                    train_situation = [x[0](y) for x, y in zip(train_options, train_situation)]
+                elif train_options[0][1] != None:
+                    train_situation = [x[0](y, x[1]) for x, y in zip(train_options, train_situation)]
 
         train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
 
@@ -56,6 +68,13 @@ class Inductive(TaskManager):
                 test_situation = [apply_routine(x, self.global_value_map) for x in test_situation]
             elif what_to_try == 'apply_direct_transformation':
                 test_situation = [apply_routine(w, x, y, z) for w, x, y, z in zip(test_situation, test_color_to_tokens, test_objective, test_token_to_colors)]
+            elif what_to_try == 'apply_flips':
+                if all([x != None and x == train_options[0] for x in train_options]):
+                    test_options = [train_options[0]] * len(test_situation)
+                    if test_options[0][1] == None:
+                        test_situation = [x[0](y) for x, y in zip(test_options, test_situation)]
+                    elif test_options[0][1] != None:
+                        test_situation = [x[0](y, x[1]) for x, y in zip(test_options, test_situation)]
 
             if len(self.testoutputs) > 0:
                 test_screen = [np.array_equal(x, y) for x, y in zip(test_situation, self.testoutputs)]
@@ -74,7 +93,7 @@ class Inductive(TaskManager):
 
         return current_situation, train_situation, train_screen, test_situation, test_screen
 
-    def get_features(self):
+    def get_prior_knowledge(self):
         # First figure out the bg
         if self.global_bg:
             bg_train = [self.bg] * self.num_train
@@ -84,20 +103,23 @@ class Inductive(TaskManager):
             bg_test = [get_background(x) for x in self.testinputs]
 
         # second gather prior knowledge
-        train_inputs = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_train_preds, bg_train, self.color_to_tokens)]
-        test_inputs = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_test_preds, bg_test, self.test_color_to_tokens)]
-        train_outputs = [apply_transform_map(x, y) for x, y in zip(self.trainoutputs, self.color_to_tokens)]
+        traininputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_train_preds, bg_train, self.color_to_tokens)]
+        testinputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_test_preds, bg_test, self.test_color_to_tokens)]
+        trainoutputs_tokenized = [apply_transform_map(x, y) for x, y in zip(self.trainoutputs, self.color_to_tokens)]
+        return traininputs_prkn, testinputs_prkn, trainoutputs_tokenized
 
-        if all([x.shape[1] == y.shape[0] and x.shape[2] == y.shape[1] for x, y in zip(train_inputs, train_outputs)]):
+
+    def get_features(self):
+
+        if all([x.shape[1] == y.shape[0] and x.shape[2] == y.shape[1] for x, y in zip(self.traininputs_prkn, self.trainoutputs_tokenized)]):
             # Third: featurize
             x_train = []
             y_train = []
-            for x, y in zip(train_inputs, train_outputs):
+            for x, y in zip(self.traininputs_prkn, self.trainoutputs_tokenized):
                 features, target = featurize_prior_knowledge_train(x, y)
                 x_train.append(features)
                 y_train.append(target)
-            x_test =  [featurize_prior_knowledge_test(x) for x in test_inputs]
-
+            x_test =  [featurize_prior_knowledge_test(x) for x in self.testinputs_prkn]
 
             # Fourth: stack train cases
             cur_x_train = x_train[0]
@@ -116,10 +138,7 @@ class Inductive(TaskManager):
 
             return cur_x_train, cur_y_train, cur_x_test
         else:
-            return train_inputs, train_outputs, test_inputs
-
-
-
+            return self.traininputs_prkn, self.trainoutputs_tokenized, self.testinputs_prkn
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop
@@ -130,14 +149,6 @@ class Inductive(TaskManager):
             self.mechanisms.append(mechanisms)
             self.cur_test_preds = this_testpred
             self.test_situation = this_testpred
-            return
-
-        # try flips related
-        self.current_situation, self.train_situation, self.train_screen, self.test_situation, self.test_screen, mechnsim = self.dimensionWork.screen_flips()
-        if self.current_situation == 'passed_all_testinputs':
-            self.solved = 'solved'
-            self.mechanisms.append(mechnsim)
-            self.cur_test_preds = self.test_situation
             return
 
         # go cages and be careful or othwrwise yo'll screw it up
@@ -174,11 +185,9 @@ class Inductive(TaskManager):
                             if current_situation == 'passed_all_testinputs':
                                 self.solved = 'solved'
                                 self.mechanisms.append(self.apply_routine_list[indices][1])
-                            return current_situation, train_situation, train_screen, test_situation, test_screen
-                        else:
-                            return 'unavailable_apply', [], [], [], []
-                    else:
-                        return 'ineligible', [], [], [], []
+                                return current_situation, train_situation, train_screen, test_situation, test_screen
+
+                return 'ineligible', [], [], [], []
             else: # we need to find out
                 return 'different_dimension', [], [], [], []
         else:

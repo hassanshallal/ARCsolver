@@ -670,6 +670,14 @@ def list_comparator(l1, l2):
             return '<'
         elif all([x == y for x, y in zip(l1, l2)]):
             return '=='
+        elif l1[0] == l2[0] and l1[1] > l2[1]:
+            return '=>'
+        elif l1[0] == l2[0] and l1[1] < l2[1]:
+            return '=<'
+        elif l1[0] > l2[0] and l1[1] == l2[1]:
+            return '>='
+        elif l1[0] < l2[0] and l1[1] == l2[1]:
+            return '<='
         else:
             return None
     else:

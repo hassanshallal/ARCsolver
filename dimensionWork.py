@@ -31,7 +31,7 @@ class DimensionWork:
         self.col_dim_ouputs = [x[1] for x in self.trainoutputs_shapes]
 
         self.dimension_status, self.output_dim_preds = self.cognify_dimensions()
-
+        # print(self.traininput_shapes, self.trainoutputs_shapes, self.is_sim_in_shapes, self.is_sim_out_shapes, self.is_same_ndim_couple, self.is_same_dim_couple, self.what_relation, self.same_relation, self.unidirctional, self.in_mult_fact, self.is_sim_int_div, self.is_sim_internal_int_div, self.is_one_row_output, self.row_dim_ouputs, self.is_one_column_output, self.col_dim_ouputs)
     def match_row_or_col(self, iuo):
         fg = self.communication.get_frequency_graph(self.communication.frequency_counter_traininputs)
         if all([x in y for x, y in zip(iuo, fg)]):
@@ -47,7 +47,7 @@ class DimensionWork:
             return 'deduced', [tuple(x.shape) for x in self.cur_test_preds]
 
         elif self.is_same_ndim_couple and not self.is_same_dim_couple:
-            if self.same_relation and (self.what_relation[0] == '>' or self.what_relation[0] == '<'):
+            if self.same_relation and (self.what_relation[0] != '==' and self.what_relation[0] != None):
                 if self.unidirctional and self.is_sim_int_div:
                     return 'deduced', [tuple(x) for x in modify_dimensiosn(self.testinput_shapes, self.in_mult_fact[0])]
                 elif self.unidirctional and not self.is_sim_int_div:
@@ -95,11 +95,13 @@ class DimensionWork:
             return 'unsolved', [], self.cur_test_preds
         elif self.is_same_ndim_couple and not self.is_same_dim_couple and self.same_relation and self.unidirctional:
             if self.is_sim_int_div:
+                #if self.what_relation[0] == '>':
                 if int(self.in_mult_fact[0][0]) != 0 and int(self.in_mult_fact[0][1]) != 0:
                     is_expanded = all([np.all(np.repeat(np.repeat(x, int(y[0]), 0), int(y[1]), 1) == z) for x, y, z in zip(self.cur_train_preds, self.in_mult_fact, self.communication.trainoutputs)])
                 else:
                     is_expanded =  False
 
+                #if self.what_relation[0] == '<':
                 if int(1/self.in_mult_fact[0][0]) != 0 and int(1/self.in_mult_fact[0][1]) != 0:
                     is_contracted = all([np.all(x[::int(1/y[0]),::int(1/y[1])] == z) for x, y, z in zip(self.cur_train_preds, self.in_mult_fact, self.communication.trainoutputs)])
                 else:
@@ -163,45 +165,4 @@ class DimensionWork:
     # current_situation = 'passed_some_traininputs'
     # current_situation = 'unpassed_all_traininputs'
     # current_situation, train_situation, train_screen, test_situation, test_screen
-    def screen_flips(self):
-        current_situation = 'screening flips'
-        train_situation = deepcopy(self.cur_train_preds)
-        train_screen = [False] * len(train_situation)
-        test_situation = deepcopy(self.cur_test_preds)
-        test_screen = ['nil'] * len(test_situation)
-
-
-        are_flips = [screen_flips_rotation(in_, out_) for in_, out_ in zip(train_situation, self.communication.trainoutputs)]
-        is_all_situation_on_train = all([x[0] != None for x in are_flips]) and all([x[0] == are_flips[0][0] for x in are_flips])
-        is_any_situation_on_train = any([x[0] != None for x in are_flips]) and any([x[0] == are_flips[0][0] for x in are_flips])
-        if is_all_situation_on_train:
-            current_situation = 'passed_all_traininputs'
-
-            if are_flips[0][1] != None:
-                train_situation = [are_flips[0][0](x, are_flips[0][1]) for x in train_situation]
-                train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.communication.trainoutputs)]
-                test_situation = [are_flips[0][0](x, are_flips[0][1]) for x in test_situation]
-            else:
-                train_situation = [are_flips[0][0](x) for x in train_situation]
-                train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.communication.trainoutputs)]
-                test_situation = [are_flips[0][0](x) for x in test_situation]
-
-            if len(self.communication.testoutputs) == len(self.communication.cur_test_preds):
-                test_screen = [np.array_equal(x, y) for x, y in zip(test_situation, self.communication.testoutputs)]
-                if all(test_screen):
-                    current_situation = 'passed_all_testinputs'
-                elif any(situation_on_test):
-                    current_situation = 'passed_some_testinputs'
-                else:
-                    current_situation = 'unpassed_all_testinputs'
-                return current_situation, train_situation, train_screen, test_situation, test_screen, [(are_flips[0][0], are_flips[0][1])]
-            elif len(self.communication.testoutputs) == 0:
-                current_situation = 'ineligible'
-                return current_situation, train_situation, train_screen, test_situation, test_screen, [(are_flips[0][0], are_flips[0][1])]
-
-        elif is_any_situation_on_train:
-            current_situation = 'passed_some_traininputs'
-        else:
-            current_situation = 'unpassed_all_traininputs'
-
-        return current_situation, train_situation, train_screen, test_situation, test_screen, [(are_flips[0][0], are_flips[0][1])]
+    

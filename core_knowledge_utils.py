@@ -34,6 +34,12 @@ def check_value_maps(couple_val_map):
             return True, 'apply_direct_transformation' # 266, 336, 388
     return False, ''
 
+
+def check_flips():
+    return True, 'apply_flips'
+
+
+
 def apply_transform_map(in_, color_to_token):
     dim_0 = in_.shape[0]
     dim_1 = in_.shape[1]
@@ -143,6 +149,17 @@ def get_frequency_situation(in_):
     return apply_transform_map(in_, frequency_dict), apply_transform_map(in_, sorting_dict)
 
 
+def get_flips_rotation(in_):
+    # get_diagonal_mirror is more precedent than rotation which is more precedent over flipud or fliplr
+    diagonal_mirror = get_diagonal_mirror(in_)
+    offdiagonal_mirror = get_offdiagonal_mirror(in_)
+    rotated90_1 = np.rot90(in_, 1, axes = (0, 1))
+    rotated90_2 = np.rot90(in_, 2, axes = (0, 1))
+    rotated90_3 = np.rot90(in_, 3, axes = (0, 1))
+    flipped_ud = np.flipud(in_)
+    flipped_lr = np.fliplr(in_)
+    return diagonal_mirror, offdiagonal_mirror, rotated90_1, rotated90_2, rotated90_3, flipped_ud, flipped_lr
+
 def build_prior_knowledge(in_, bg, color_to_token):
     x_situation, y_situation = get_x_y_situation(in_)
     frequency_graph, sorted_frequency_graph = get_frequency_situation(in_)
@@ -168,7 +185,6 @@ def featurize_prior_knowledge_train(in_p_k, tokenized_target_arr):
 
     return np.array(x, dtype = object), np.array(y, dtype = object)
 
-
 def featurize_prior_knowledge_test(in_p_k):
     x = []
     dim_0 = in_p_k.shape[1]
@@ -181,33 +197,36 @@ def featurize_prior_knowledge_test(in_p_k):
     return np.array(x, dtype = object)
 
 def sets_obj_on_train(cur_x_train, cur_y_train, this_objective):
-    objective = deepcopy(this_objective)
-    sets_dict = {}
-    for obj in objective:
-        if len(obj) == 2:
-            sets_dict[obj[0]] = [set() for index in range(1, cur_x_train.shape[1])]
-            sets_dict[obj[1]] = [set() for index in range(1, cur_x_train.shape[1])]
+    if type(cur_x_train) != list and type(cur_y_train) != list:
+        objective = deepcopy(this_objective)
+        sets_dict = {}
+        for obj in objective:
+            if len(obj) == 2:
+                sets_dict[obj[0]] = [set() for index in range(1, cur_x_train.shape[1])]
+                sets_dict[obj[1]] = [set() for index in range(1, cur_x_train.shape[1])]
 
-    for n in range(cur_x_train.shape[0]):
-        first = cur_x_train[n, 0]
-        second = cur_y_train[n]
-        if (first, second) in sets_dict.keys():
-            for m in range(1, cur_x_train.shape[1]):
-                sets_dict[(first, second)][m-1].add(cur_x_train[n, m])
+        for n in range(cur_x_train.shape[0]):
+            first = cur_x_train[n, 0]
+            second = cur_y_train[n]
+            if (first, second) in sets_dict.keys():
+                for m in range(1, cur_x_train.shape[1]):
+                    sets_dict[(first, second)][m-1].add(cur_x_train[n, m])
 
-    # print('sets_dict: ', sets_dict)
-    for obj in objective:
-        if len(obj) == 2:
-            is_opprtunity = [len(x.intersection(y)) == 0 for x, y in zip(sets_dict[obj[0]], sets_dict[obj[1]])]
-            #print('is_opprtunity: ', is_opprtunity)
-            if any(is_opprtunity):
-                columns = [i+1 for i in range(len(is_opprtunity)) if is_opprtunity[i]]
-                #print('columns: ', columns)
-                obj.append(columns)
+        # print('sets_dict: ', sets_dict)
+        for obj in objective:
+            if len(obj) == 2:
+                is_opprtunity = [len(x.intersection(y)) == 0 for x, y in zip(sets_dict[obj[0]], sets_dict[obj[1]])]
+                #print('is_opprtunity: ', is_opprtunity)
+                if any(is_opprtunity):
+                    columns = [i+1 for i in range(len(is_opprtunity)) if is_opprtunity[i]]
+                    #print('columns: ', columns)
+                    obj.append(columns)
 
-    for obj in objective:
-        if len(obj) == 3:
-            target_columns = obj[2]
-            for opp in target_columns:
-                obj.append((opp, sets_dict[obj[0]][opp-1], sets_dict[obj[1]][opp-1]))
-    return objective
+        for obj in objective:
+            if len(obj) == 3:
+                target_columns = obj[2]
+                for opp in target_columns:
+                    obj.append((opp, sets_dict[obj[0]][opp-1], sets_dict[obj[1]][opp-1]))
+        return objective
+    else:
+        return this_objective
