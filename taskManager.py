@@ -1,10 +1,4 @@
-# Be subtle and abstract
 from utils import *
-# from communicate import *
-# from inductive_core_knowledge import *
-# from edges import *
-# from neighbors import *
-
 
 def flip_test_train(task, num):
     modified_task = deepcopy(task)
@@ -77,8 +71,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         # problem description
         self.problem_graph = self.express_problem_graph()
-
-
         self.assignments_leads, self.int_anchor_vals, self.asssignments_output = self.generate_set_assignemtns()
         self.objective, self.objective_status = self.get_objectives()
 

@@ -1,3 +1,4 @@
+from utils import *
 from edges import *
 from neighbors import *
 
@@ -22,6 +23,15 @@ def find_intersection_keys_values(this_map):
 
     return len(keys_set.intersection(values_set)) == 0, all([len(x) == 1 for x in this_map.values()])
 
+def extract_objects(x):
+    _objects = find_objects(x)
+
+    extracted = []
+    for obj in _objects:
+        if obj != None:
+            extracted.append([list(obj)[0].start, list(obj)[0].stop, list(obj)[1].start, list(obj)[1].stop, (list(obj)[0].stop - list(obj)[0].start), (list(obj)[1].stop - list(obj)[1].start)])
+    return extracted
+
 
 # This is a check method, important for two routines
 def check_value_maps(couple_val_map):
@@ -37,7 +47,6 @@ def check_value_maps(couple_val_map):
 
 def check_flips():
     return True, 'apply_flips'
-
 
 
 def apply_transform_map(in_, color_to_token):
@@ -60,8 +69,7 @@ def apply_transform_map(in_, color_to_token):
     for n in range(dim_0):
         for m in range(dim_1):
             visited[n, m]  = False
-    #print(tokenized_situation)
-    #print(visited)
+
     for n in range(dim_0):
         for m in range(dim_1):
             if in_[n, m] in color_to_token.keys() and visited[n, m] == False:
@@ -74,8 +82,6 @@ def apply_transform_map(in_, color_to_token):
                     tokenized_situation[n, m] = in_[n, m]
                 visited[n, m] = True
 
-            #print(tokenized_situation)
-            #print(visited)
     return tokenized_situation
 
 # This is a method to apply somthing on an input array, can be extiensible with *args in order to
@@ -123,6 +129,15 @@ def get_x_y_situation(in_):
 
     return x_situation, y_situation
 
+def get_frequency_graph(frequency_counter):
+    frequency_graph = []
+    for x in frequency_counter:
+        this_list = []
+        for n in x:
+            this_list.append(n[0])
+            this_list.append(n[1])
+        frequency_graph.append(this_list)
+    return frequency_graph
 
 def get_frequency_situation(in_):
     frequency_counter = Counter(list(itertools.chain.from_iterable(in_.tolist()))).most_common()

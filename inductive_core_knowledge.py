@@ -1,20 +1,22 @@
 from taskManager import *
 from core_knowledge_utils import *
 
-from communicate import *
-from dimensionWork import *
+from fragmented_core_knowledge import *
+
 from edges import *
 from neighbors import *
-from cages import *
+
 
 class Inductive(TaskManager):
     def __init__(self, raw_task, forced_bg = None):
         super().__init__(raw_task, forced_bg = None)
-        self.communication = Communication(self.cur_train_preds, self.trainoutputs, self.cur_test_preds, self.bg, self.objective_status, self.objective, self.assignments_leads, self.asssignments_output, self.token_to_colors, self.test_token_to_colors, self.testinputs_vals, self.test_objective, self.testoutputs)
-        self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
-        self.dimension_status, self.output_dim_preds = self.dimensionWork.get_dimension_cognified()
-        self.communication.carry_along_kwargs(output_dim_preds = self.output_dim_preds)
-        self.communication.carry_along_kwargs(is_similar_dim = self.is_similar_dim)
+
+        self.fragmented_core_knowledge = Fragmented(self.cur_train_preds, self.trainoutputs, self.cur_test_preds, self.bg, self.testinputs_vals, self.testoutputs)
+        # self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
+        self.dimension_status, self.output_dim_preds = self.fragmented_core_knowledge.get_dimension_cognified()
+        self.fragmented_core_knowledge.carry_along_kwargs(dimension_status = self.dimension_status)
+        self.fragmented_core_knowledge.carry_along_kwargs(output_dim_preds = self.output_dim_preds)
+        self.fragmented_core_knowledge.carry_along_kwargs(is_similar_dim = self.is_similar_dim)
 
         # second gather prior knowledge
         self.traininputs_prkn, self.testinputs_prkn, self.trainoutputs_tokenized  = self.get_prior_knowledge()
@@ -23,8 +25,8 @@ class Inductive(TaskManager):
         self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_features()
         self.running_objective = [sets_obj_on_train(self.cur_x_train, self.cur_y_train, objec) for objec in self.objective]
 
-        self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips())]
-        self.apply_routine_list = [('apply_value_maps', apply_value_maps), ('apply_direct_transformation', apply_direct_transformation), ('apply_flips', screen_flips_rotation)]
+        self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips()), ('check_unique_output', self.fragmented_core_knowledge.check_unique_output())]
+        self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output', self.fragmented_core_knowledge.apply_unique_output, 'ineligible')]
 
         self.solved, self.mechanisms = 'unsolved', []
         self.current_situation, self.train_situation, self.train_screen, self.test_situation, self.test_screen = 'ineligible', [], [], [], []
@@ -58,6 +60,8 @@ class Inductive(TaskManager):
                     train_situation = [x[0](y) for x, y in zip(train_options, train_situation)]
                 elif train_options[0][1] != None:
                     train_situation = [x[0](y, x[1]) for x, y in zip(train_options, train_situation)]
+        elif what_to_try == 'apply_unique_output':
+            train_situation = self.fragmented_core_knowledge.apply_unique_output(self.fragmented_core_knowledge.unique_output_indices, self.fragmented_core_knowledge.frequency_graph_traininputs)
 
         train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
 
@@ -75,6 +79,8 @@ class Inductive(TaskManager):
                         test_situation = [x[0](y) for x, y in zip(test_options, test_situation)]
                     elif test_options[0][1] != None:
                         test_situation = [x[0](y, x[1]) for x, y in zip(test_options, test_situation)]
+            elif what_to_try == 'apply_unique_output':
+                test_situation = self.fragmented_core_knowledge.apply_unique_output(self.fragmented_core_knowledge.unique_output_indices, self.fragmented_core_knowledge.frequency_graph_testinputs)
 
             if len(self.testoutputs) > 0:
                 test_screen = [np.array_equal(x, y) for x, y in zip(test_situation, self.testoutputs)]
@@ -110,7 +116,6 @@ class Inductive(TaskManager):
 
 
     def get_features(self):
-
         if all([x.shape[1] == y.shape[0] and x.shape[2] == y.shape[1] for x, y in zip(self.traininputs_prkn, self.trainoutputs_tokenized)]):
             # Third: featurize
             x_train = []
@@ -143,19 +148,7 @@ class Inductive(TaskManager):
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop
         # try dimension related
-        self.solved, mechanisms,  this_testpred = self.dimensionWork.screen_dimesnions()
-        if self.solved == 'solved':
-            self.current_situation = 'passed_all_testinputs'
-            self.mechanisms.append(mechanisms)
-            self.cur_test_preds = this_testpred
-            self.test_situation = this_testpred
-            return
-
-        # go cages and be careful or othwrwise yo'll screw it up
-        #print('attemting to have a cage instance')
-        cages = Cages(self.communication)
-        #print('cages:', attrs(cages))
-        self.solved, mechanisms, this_testpred = cages.screen_cages(self.dimension_status)
+        self.solved, mechanisms,  this_testpred = self.fragmented_core_knowledge.screen_dimesnions()
         if self.solved == 'solved':
             self.current_situation = 'passed_all_testinputs'
             self.mechanisms.append(mechanisms)
@@ -167,28 +160,20 @@ class Inductive(TaskManager):
         return
 
     def screen_case(self):
-        # logic: this must be screen_a_thing which can be an array or an object in an array
-        # We need a system that is aware here man
-        # We can't use if conditional, the system must naturally process the task
-        # and apply different strategies regardless of dimension, bg, etc
-        # this logic is very narrow and doesn't serve our purposes
-
         if self.dimension_status =='deduced':
-            if self.is_similar_dim:
-                for check_routine in self.check_routine_list:
-                    try_it, what_to_apply = check_routine[1]
-                    if try_it:
-                        indices = [i for i, tupl in enumerate(self.apply_routine_list) if tupl[0] == what_to_apply]
-                        if len(indices) == 1:
-                            indices = indices.pop()
-                            current_situation, train_situation, train_screen, test_situation, test_screen = self.try_apply_routines(what_to_apply, self.apply_routine_list[indices][1])
-                            if current_situation == 'passed_all_testinputs':
-                                self.solved = 'solved'
-                                self.mechanisms.append(self.apply_routine_list[indices][1])
-                                return current_situation, train_situation, train_screen, test_situation, test_screen
-
-                return 'ineligible', [], [], [], []
-            else: # we need to find out
-                return 'different_dimension', [], [], [], []
+            for check_routine in self.check_routine_list:
+                try_it, what_to_apply = check_routine[1]
+                if try_it:
+                    indices = [i for i, tupl in enumerate(self.apply_routine_list) if tupl[0] == what_to_apply]
+                    if len(indices) == 1:
+                        indices = indices.pop()
+                        current_situation, train_situation, train_screen, test_situation, test_screen = self.try_apply_routines(what_to_apply, self.apply_routine_list[indices][1])
+                        if current_situation in ['passed_all_traininputs', 'passed_some_traininputs', 'passed_all_testinputs', 'passed_some_testinputs']:
+                            self.apply_routine_list[indices] = (self.apply_routine_list[indices][0], self.apply_routine_list[indices][1], current_situation)
+                        if current_situation == 'passed_all_testinputs':
+                            self.solved = 'solved'
+                            self.mechanisms.append(self.apply_routine_list[indices][1])
+                            return current_situation, train_situation, train_screen, test_situation, test_screen
+            return 'ineligible', [], [], [], []
         else:
-            return 'unknown_dimensions', [], [], [], []
+            return 'ineligible', [], [], [], []

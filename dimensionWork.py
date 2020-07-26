@@ -30,6 +30,21 @@ class DimensionWork:
         self.is_one_column_output = all([x[1] == 1 and x[0] >= 1 for x in self.trainoutputs_shapes])
         self.col_dim_ouputs = [x[1] for x in self.trainoutputs_shapes]
 
+        
+        self.in_objects = [extract_objects(find_objects(x)) for x in self.cur_train_preds]
+        self.out_objects = [extract_objects(find_objects(x)) for x in self.communication.trainoutputs]
+        self.cond1 = all([len(x) == 1 for x in self.out_objects])
+        self.cond2 = all([len(self.out_objects[n]) > 0 and self.out_objects[n][0][0] == 0 and self.out_objects[n][0][0] == self.out_objects[n][0][2] for n in range(len(self.out_objects))])
+        self.cond3 = all([len(self.out_objects[n]) > 0 and is_out_obj_in_in_objs(self.out_objects[n][0], self.in_objects[n]) for n in range(len(self.out_objects))])
+        self.cond4 = all([x == [[0, 1, 0, 1]] or x == [] for x in self.out_objects])
+        self.cond5 = all([len(x) == len(y) for x, y in zip(self.in_objects, self.out_objects)])
+        self.cond6 = all([direct_obj_movement_detection(x, y) for x, y in zip(self.in_objects, self.out_objects)])
+        self.cond7 = all([one_obj_move(x, y) for x, y in zip(self.in_objects, self.out_objects)])
+        self.cond8 = all([len(x) < len(y) for x, y in zip(self.in_objects, self.out_objects)])
+        self.cond9 = all([len(x) == 0 for x in self.in_objects])
+        self.cond10 = all([sorted(x) == sorted(y) for x, y in zip(self.in_objects, self.out_objects)])
+
+
         self.dimension_status, self.output_dim_preds = self.cognify_dimensions()
         # print(self.traininput_shapes, self.trainoutputs_shapes, self.is_sim_in_shapes, self.is_sim_out_shapes, self.is_same_ndim_couple, self.is_same_dim_couple, self.what_relation, self.same_relation, self.unidirctional, self.in_mult_fact, self.is_sim_int_div, self.is_sim_internal_int_div, self.is_one_row_output, self.row_dim_ouputs, self.is_one_column_output, self.col_dim_ouputs)
     def match_row_or_col(self, iuo):
@@ -72,6 +87,10 @@ class DimensionWork:
                 return 'deduced', [(1, x) for x in self.communication.freq_nonbg_testinputs]
             if self.is_one_column_output and self.row_dim_ouputs == self.communication.freq_nonbg_traininputs:
                 return 'deduced', [(x, 1) for x in self.communication.freq_nonbg_testinputs]
+        elif self.cond1 and self.cond2 and self.cond3:
+            # output an object [30, 35, 48, 87]: one out object and it is one of the in objects:
+            test_in_objects = [extract_objects(ndimage.find_objects(x)) for x in self.cur_test_preds]
+            return 'object_deduced', test_in_objects
 
         return 'undeduced', [tuple(x) for x in self.testinput_shapes]
 
@@ -165,4 +184,3 @@ class DimensionWork:
     # current_situation = 'passed_some_traininputs'
     # current_situation = 'unpassed_all_traininputs'
     # current_situation, train_situation, train_screen, test_situation, test_screen
-    
