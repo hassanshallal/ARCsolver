@@ -33,20 +33,74 @@ def extract_objects(x):
     return extracted
 
 
+def build_a_prediction(reference, **kwargs):
+    for k, v in kwargs.items():
+        if k == 'add_to_zero':
+            cur_output = np.zeros(reference) # reference is dimensions
+            cur_output += v
+            cur_output = cur_output.astype(int)
+            return [y.tolist() for y in cur_output]
+    return None
+
 # This is a check method, important for two routines
 def check_value_maps(couple_val_map):
     results = set([find_intersection_keys_values(x) for x in couple_val_map])
     if len(results) == 1:
         result = results.pop()
         if result== (True, True):
-            return True, 'apply_value_maps' # 15, 275, 308
+            return True, 'apply_value_maps', {} # 15, 275, 308
         elif result == (False, True):
-            return True, 'apply_direct_transformation' # 266, 336, 388
-    return False, ''
+            return True, 'apply_direct_transformation', {} # 266, 336, 388
+    return False, '', {}
 
 
-def check_flips():
-    return True, 'apply_flips'
+def check_flips(cur_train_preds, trainoutput):
+    to_pass = {}
+    x, y = screen_flips_rotation(cur_train_preds[0], trainoutput[0])
+    train_options = [screen_flips_rotation(x, y) for x, y in zip(cur_train_preds, trainoutput)]
+    if all([x != (None, None) and x == train_options[0] for x in train_options]):
+        to_pass['routine'] = train_options[0]
+        return True, 'apply_flips', to_pass
+    else:
+        return False, '', to_pass
+
+
+def check_unique_output(cur_train_preds, trainoutputs, bg_in_unique_train_outputs, bg):
+    outcome = False
+    what_to_try = ''
+
+    unique_train_outputs = [np.unique(x).tolist() for x in trainoutputs]
+    is_unique_train_outputs = [len(x) == 1 for x in unique_train_outputs]
+    to_pass = {}
+    to_pass['bg_in_unique_train_outputs'] = bg_in_unique_train_outputs
+    to_pass['bg'] = bg
+
+    if all(is_unique_train_outputs):
+        unique_train_outputs = [x[0] for x in unique_train_outputs]
+
+        # test frequency based:
+        frequency_graph_traininputs = get_frequency_graph([Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in cur_train_preds], bg_in_unique_train_outputs, bg)
+
+        if all([x in y for x, y in zip(unique_train_outputs, frequency_graph_traininputs)]):
+            indices = [y.index(x) for x, y in zip(unique_train_outputs, frequency_graph_traininputs)]
+            if all([x == indices[0] for x in indices]) and indices[0] % 2 == 0:
+                to_pass['index'] = indices[0]
+                return True, 'apply_unique_output_frequency', to_pass
+            return  outcome, what_to_try, to_pass
+        return  outcome, what_to_try, to_pass
+
+    return  outcome, what_to_try, to_pass
+
+def apply_unique_output_frequency(cur_preds, output_dim_preds, pass_info): # 128, 99, 338
+    freq_graph = get_frequency_graph([Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in cur_preds], pass_info['bg_in_unique_train_outputs'], pass_info['bg'])
+
+    if all([len(x) > pass_info['index'] for x in freq_graph]):
+        props = [x[pass_info['index']] for x in freq_graph]
+    elif all([len(x) == 1 for x in freq_graph]):
+        props = [x[0] for x in freq_graph]
+
+    this_output = [build_a_prediction(k, add_to_zero = l) for k, l in zip(output_dim_preds, props)]
+    return this_output
 
 
 def apply_transform_map(in_, color_to_token):
@@ -84,10 +138,7 @@ def apply_transform_map(in_, color_to_token):
 
     return tokenized_situation
 
-# This is a method to apply somthing on an input array, can be extiensible with *args in order to
-# apply other dicts, for example: 0 edge to nonbgpr1 for example, so, this must be an east to
-# exapnd application function that takes a dict and extra arguments to change an in_ grid
-def apply_value_maps(in_, signal_map):
+def apply_value_maps(in_, signal_map, pass_info):
     dim_0 = in_.shape[0]
     dim_1 = in_.shape[1]
 
@@ -101,9 +152,7 @@ def apply_value_maps(in_, signal_map):
     return in_
 
 
-def apply_direct_transformation(in_, color_to_token, objective, token_to_color):
-    # Preliminary and baseline transformation
-    # input_grid using color_to_token = tokenized_grid
+def apply_direct_transformation(in_, color_to_token, objective, token_to_color, pass_info):
     # apply objective
     x = apply_transform_map(in_, color_to_token)
     change_dict = {}
@@ -129,13 +178,14 @@ def get_x_y_situation(in_):
 
     return x_situation, y_situation
 
-def get_frequency_graph(frequency_counter):
+def get_frequency_graph(frequency_counter, include_bg, bg):
     frequency_graph = []
     for x in frequency_counter:
         this_list = []
         for n in x:
-            this_list.append(n[0])
-            this_list.append(n[1])
+            if (n[0] == bg and include_bg == True) or (n[0] != bg):
+                this_list.append(n[0])
+                this_list.append(n[1])
         frequency_graph.append(this_list)
     return frequency_graph
 
@@ -185,7 +235,7 @@ def build_prior_knowledge(in_, bg, color_to_token):
     return np.stack((tokenized_graph, in_, x_situation, y_situation, frequency_graph, sorted_frequency_graph, edge_situation, neighbor_situation), axis = 0)
 
 def featurize_prior_knowledge_train(in_p_k, tokenized_target_arr):
-    #print(tokenized_target_arr)
+    # print(tokenized_target_arr)
     # print(in_p_k.shape)
     # print(tokenized_target_arr.shape)
     x = []
@@ -210,38 +260,3 @@ def featurize_prior_knowledge_test(in_p_k):
             x.append(in_p_k[:, n, m].tolist())
 
     return np.array(x, dtype = object)
-
-def sets_obj_on_train(cur_x_train, cur_y_train, this_objective):
-    if type(cur_x_train) != list and type(cur_y_train) != list:
-        objective = deepcopy(this_objective)
-        sets_dict = {}
-        for obj in objective:
-            if len(obj) == 2:
-                sets_dict[obj[0]] = [set() for index in range(1, cur_x_train.shape[1])]
-                sets_dict[obj[1]] = [set() for index in range(1, cur_x_train.shape[1])]
-
-        for n in range(cur_x_train.shape[0]):
-            first = cur_x_train[n, 0]
-            second = cur_y_train[n]
-            if (first, second) in sets_dict.keys():
-                for m in range(1, cur_x_train.shape[1]):
-                    sets_dict[(first, second)][m-1].add(cur_x_train[n, m])
-
-        # print('sets_dict: ', sets_dict)
-        for obj in objective:
-            if len(obj) == 2:
-                is_opprtunity = [len(x.intersection(y)) == 0 for x, y in zip(sets_dict[obj[0]], sets_dict[obj[1]])]
-                #print('is_opprtunity: ', is_opprtunity)
-                if any(is_opprtunity):
-                    columns = [i+1 for i in range(len(is_opprtunity)) if is_opprtunity[i]]
-                    #print('columns: ', columns)
-                    obj.append(columns)
-
-        for obj in objective:
-            if len(obj) == 3:
-                target_columns = obj[2]
-                for opp in target_columns:
-                    obj.append((opp, sets_dict[obj[0]][opp-1], sets_dict[obj[1]][opp-1]))
-        return objective
-    else:
-        return this_objective

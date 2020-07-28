@@ -11,28 +11,39 @@ class Inductive(TaskManager):
     def __init__(self, raw_task, forced_bg = None):
         super().__init__(raw_task, forced_bg = None)
 
-        self.fragmented_core_knowledge = Fragmented(self.cur_train_preds, self.trainoutputs, self.cur_test_preds, self.bg, self.testinputs_vals, self.testoutputs)
+        self.fragmented_core_knowledge = Fragmented(self.cur_train_preds, self.trainoutputs, self.cur_test_preds, self.bg, self.testoutputs)
         # self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
-        self.dimension_status, self.output_dim_preds = self.fragmented_core_knowledge.get_dimension_cognified()
+        self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.fragmented_core_knowledge.get_dimension_cognified()
+
         self.fragmented_core_knowledge.carry_along_kwargs(dimension_status = self.dimension_status)
-        self.fragmented_core_knowledge.carry_along_kwargs(output_dim_preds = self.output_dim_preds)
+        self.fragmented_core_knowledge.carry_along_kwargs(train_output_dim_preds = self.train_output_dim_preds)
+        self.fragmented_core_knowledge.carry_along_kwargs(test_output_dim_preds = self.test_output_dim_preds)
         self.fragmented_core_knowledge.carry_along_kwargs(is_similar_dim = self.is_similar_dim)
 
-        # second gather prior knowledge
-        self.traininputs_prkn, self.testinputs_prkn, self.trainoutputs_tokenized  = self.get_prior_knowledge()
 
-        # if self.is_similar_dim:
+        self.unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
+        # logical Factors
+        self.is_unique_train_outputs = all([len(x) == 1 for x in self.unique_train_outputs])
+        #print('is_unique_train_outputs:', self.is_unique_train_outputs)
+        if self.is_unique_train_outputs:
+            self.bg_in_unique_train_outputs = self.bg in self.unique_train_outputs
+        else:
+            self.bg_in_unique_train_outputs = None
+
+
+        # get prior knowledge
         self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_features()
-        self.running_objective = [sets_obj_on_train(self.cur_x_train, self.cur_y_train, objec) for objec in self.objective]
+        self.running_objective = [self.sets_obj_on_train(x_train, y_train, objec) for x_train, y_train, objec in zip(self.cur_x_train, self.cur_y_train, self.objective)]
+        self.running_test_objective = self.validate_running_objective()
 
-        self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips()), ('check_unique_output', self.fragmented_core_knowledge.check_unique_output())]
-        self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output', self.fragmented_core_knowledge.apply_unique_output, 'ineligible')]
+        self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips(self.cur_train_preds, self.trainoutputs)), ('check_unique_output', check_unique_output(self.cur_train_preds, self.trainoutputs, self.bg_in_unique_train_outputs, self.bg))]
+        self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output_frequency', apply_unique_output_frequency, 'ineligible')]
 
         self.solved, self.mechanisms = 'unsolved', []
         self.current_situation, self.train_situation, self.train_screen, self.test_situation, self.test_screen = 'ineligible', [], [], [], []
         self.inductive_strategy()
 
-    def try_apply_routines(self, what_to_try, apply_routine):
+    def try_apply_routines(self, what_to_try, apply_routine, pass_info):
         current_situation = 'screening ' + what_to_try
         train_situation = deepcopy(self.cur_train_preds)
         train_options = [(None, None)] * len(train_situation)
@@ -48,39 +59,36 @@ class Inductive(TaskManager):
         test_token_to_colors = deepcopy(self.test_token_to_colors)
 
         if what_to_try == 'apply_value_maps':
-            train_situation = [apply_routine(x, self.global_value_map) for x in train_situation]
+            train_situation = [apply_routine(x, self.global_value_map, pass_info) for x in train_situation]
         elif what_to_try == 'apply_direct_transformation':
-            train_situation = [apply_routine(w, x, y, z) for w, x, y, z in zip(train_situation, color_to_tokens, objective, token_to_colors)]
+            train_situation = [apply_routine(w, x, y, z, pass_info) for w, x, y, z in zip(train_situation, color_to_tokens, objective, token_to_colors)]
         elif what_to_try == 'apply_flips':
-            train_options = [apply_routine(x, y) for x, y in zip(train_situation, self.trainoutputs)]
-            #print(train_options)
-            if all([x != (None, None) and x == train_options[0] for x in train_options]):
-
-                if train_options[0][1] == None:
-                    train_situation = [x[0](y) for x, y in zip(train_options, train_situation)]
-                elif train_options[0][1] != None:
-                    train_situation = [x[0](y, x[1]) for x, y in zip(train_options, train_situation)]
-        elif what_to_try == 'apply_unique_output':
-            train_situation = self.fragmented_core_knowledge.apply_unique_output(self.fragmented_core_knowledge.unique_output_indices, self.fragmented_core_knowledge.frequency_graph_traininputs)
+            if pass_info['routine'][1] == None:
+                routines = [pass_info['routine'][0]] * len(self.traininputs)
+                train_situation = [x(y) for x, y in zip(routines, train_situation)]
+            elif pass_info['routine'][1] != None:
+                routines = [pass_info['routine']] * len(self.traininputs)
+                train_situation = [x[0](y, x[1]) for x, y in zip(routines, train_situation)]
+        elif what_to_try == 'apply_unique_output_frequency':
+            train_situation = apply_unique_output_frequency(self.cur_train_preds, self.train_output_dim_preds, pass_info)
 
         train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
 
         if all(train_screen):
-
             current_situation = 'passed_all_traininputs'
             if what_to_try == 'apply_value_maps':
-                test_situation = [apply_routine(x, self.global_value_map) for x in test_situation]
+                test_situation = [apply_routine(x, self.global_value_map, pass_info) for x in test_situation]
             elif what_to_try == 'apply_direct_transformation':
-                test_situation = [apply_routine(w, x, y, z) for w, x, y, z in zip(test_situation, test_color_to_tokens, test_objective, test_token_to_colors)]
+                test_situation = [apply_routine(w, x, y, z, pass_info) for w, x, y, z in zip(test_situation, test_color_to_tokens, test_objective, test_token_to_colors)]
             elif what_to_try == 'apply_flips':
-                if all([x != None and x == train_options[0] for x in train_options]):
-                    test_options = [train_options[0]] * len(test_situation)
-                    if test_options[0][1] == None:
-                        test_situation = [x[0](y) for x, y in zip(test_options, test_situation)]
-                    elif test_options[0][1] != None:
-                        test_situation = [x[0](y, x[1]) for x, y in zip(test_options, test_situation)]
-            elif what_to_try == 'apply_unique_output':
-                test_situation = self.fragmented_core_knowledge.apply_unique_output(self.fragmented_core_knowledge.unique_output_indices, self.fragmented_core_knowledge.frequency_graph_testinputs)
+                if pass_info['routine'][1] == None:
+                    routines = [pass_info['routine'][0]] * len(self.testinputs)
+                    test_situation = [x(y) for x, y in zip(routines, test_situation)]
+                elif pass_info['routine'][1] != None:
+                    routines = [pass_info['routine']] * len(self.testinputs)
+                    test_situation = [x[0](y, x[1]) for x, y in zip(routines, test_situation)]
+            elif what_to_try == 'apply_unique_output_frequency':
+                test_situation = apply_unique_output_frequency(self.cur_test_preds, self.test_output_dim_preds, pass_info)
 
             if len(self.testoutputs) > 0:
                 test_screen = [np.array_equal(x, y) for x, y in zip(test_situation, self.testoutputs)]
@@ -112,38 +120,108 @@ class Inductive(TaskManager):
         traininputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_train_preds, bg_train, self.color_to_tokens)]
         testinputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_test_preds, bg_test, self.test_color_to_tokens)]
         trainoutputs_tokenized = [apply_transform_map(x, y) for x, y in zip(self.trainoutputs, self.color_to_tokens)]
-        return traininputs_prkn, testinputs_prkn, trainoutputs_tokenized
+        return traininputs_prkn, trainoutputs_tokenized, testinputs_prkn
 
 
     def get_features(self):
-        if all([x.shape[1] == y.shape[0] and x.shape[2] == y.shape[1] for x, y in zip(self.traininputs_prkn, self.trainoutputs_tokenized)]):
-            # Third: featurize
-            x_train = []
-            y_train = []
-            for x, y in zip(self.traininputs_prkn, self.trainoutputs_tokenized):
-                features, target = featurize_prior_knowledge_train(x, y)
-                x_train.append(features)
-                y_train.append(target)
-            x_test =  [featurize_prior_knowledge_test(x) for x in self.testinputs_prkn]
+        traininputs_prkn, trainoutputs_tokenized, testinputs_prkn  = self.get_prior_knowledge()
+        return traininputs_prkn, trainoutputs_tokenized, testinputs_prkn
 
-            # Fourth: stack train cases
-            cur_x_train = x_train[0]
-            for n in range(1, len(x_train)):
-                cur_x_train = np.vstack((cur_x_train, x_train[n]))
+    def sets_obj_on_train(self, cur_x_train, cur_y_train, this_objective):
+        objective = deepcopy(this_objective)
+        #print('objective: ', objective)
+        sets_dict = {}
+        this_target = 'nil'
+        if cur_y_train.shape[0] == cur_x_train.shape[1] and cur_y_train.shape[1] == cur_x_train.shape[2]:
+            for obj in objective:
+                if len(obj) == 2:
+                    sets_dict[obj[0]] = [set() for index in range(1, cur_x_train.shape[0])]
+                    sets_dict[obj[1]] = [set() for index in range(1, cur_x_train.shape[0])]
+        if self.is_unique_train_outputs:
+            for obj in objective:
+                if len(obj) == 1 and len(obj[0]) == 3 and obj[0][1] != 'nil' and obj[0][2] == 'direct':
+                    this_target = obj[0][1]
+                    sets_dict[this_target] = [set() for index in range(1, cur_x_train.shape[0])]
+                    sets_dict['other'] = [set() for index in range(1, cur_x_train.shape[0])]
 
-            # Fifth: find your task classes, codify them
-            cur_y_train = y_train[0]
-            for n in range(1, len(y_train)):
-                cur_y_train = np.hstack((cur_y_train, y_train[n]))
+        #print('sets_dict before:', sets_dict)
+        if len(sets_dict) > 0:
+            for x in range(cur_x_train.shape[1]):
+                for y in range(cur_x_train.shape[2]):
+                    for z in range(1, cur_x_train.shape[0]):
+                        if this_target == 'nil':
+                            first = cur_x_train[0][x][y]
+                            second = cur_y_train[x][y]
+                            if (first, second) in sets_dict.keys():
+                                sets_dict[(first, second)][z-1].add(cur_x_train[z][x][y])
+                        elif this_target != 'nil':
+                            if cur_x_train[0][x][y] == this_target:
+                                sets_dict[this_target][z-1].add(cur_x_train[z][x][y])
+                            else:
+                                sets_dict['other'][z-1].add(cur_x_train[z][x][y])
 
-            # Fourth: stack testcases
-            cur_x_test = x_test[0]
-            for n in range(1, len(x_test)):
-                cur_x_test = np.vstack((cur_x_test, x_test[n]))
+            #print('sets_dict after: ', sets_dict)
+            # for cases where output has similar dimension to input
+            for obj in objective:
+                if len(obj) == 2:
+                    is_opprtunity = [len(x.intersection(y)) == 0 for x, y in zip(sets_dict[obj[0]], sets_dict[obj[1]])]
+                    #print('is_opprtunity: ', is_opprtunity)
+                    if any(is_opprtunity):
+                        columns = [i+1 for i in range(len(is_opprtunity)) if is_opprtunity[i]]
+                        #print('columns: ', columns)
+                        obj.append(columns)
+                        for opp in obj[2]:
+                            obj.append((opp, sets_dict[obj[0]][opp-1], sets_dict[obj[1]][opp-1]))
 
-            return cur_x_train, cur_y_train, cur_x_test
-        else:
-            return self.traininputs_prkn, self.trainoutputs_tokenized, self.testinputs_prkn
+            # for cases with unique output
+            for obj in objective:
+                if len(obj) == 1 and len(obj[0]) == 3 and obj[0][1] != 'nil' and obj[0][2] == 'direct':
+                    if self.is_unique_train_outputs:
+                        this_target = obj[0][1]
+                        sets_dict['any_opp'] = [sets_dict[this_target][x] - sets_dict['other'][x] for x in range(len(sets_dict[this_target]))]
+                        sets_dict['is_opp'] = [len(x) > 0 for x in sets_dict['any_opp']]
+                        if any(sets_dict['is_opp']):
+                            columns = [i+1 for i in range(len(sets_dict['is_opp'])) if sets_dict['is_opp'][i]]
+                            obj.append(columns)
+                            for opp in obj[1]:
+                                obj.append((opp, sets_dict['any_opp'][opp-1]))
+
+        return objective
+
+# validate running_objective: complete: each sub_objective of each training case has found a working strategy
+#                             consistent: there is a common mechanism for each sub_objective among all train retrieve_coords_from_assignments
+#                             if complete and consistent:
+#                                1) create a global running_objective (complete with consistently tackled objectives)
+#                                2) massage test_objective using the global running_objective
+# apply running_objective: input prior_knowledge, cur_preds, output: applied_cur_preds (for train or for test)
+
+    def is_complete_sub_objective(sub_objective):
+            return len(sub_objective) != 2
+
+    def validate_running_objective(self):
+        if self.objective_status == 'obd' and self.dimension_status == 'deduced' and self.running_objective != self.objective:
+            # test for completeness and for consistency of self.running_objective
+            # In this case, we just want completeness to apply, in other cases, we'll need consistency in addition to completeness
+            cur_lead = self.running_objective[0]
+            is_complete = all([is_complete_sub_objective(x) for x in cur_lead])
+
+            self.running_test_objective = [self.running_objective[0]] * len(self.cur_test_preds)
+            return
+
+        elif self.objective_status == 'red' and self.dimension_status == 'deduced' and self.running_objective != self.objective:
+            # here we need all training cases to be completeness
+            task_completeness = []
+            for case in self.running_objective:
+                task_completeness.append(all([is_complete_sub_objective(x) for x in case]))
+
+            if all(task_completeness):
+                # test consistency of similar objectives among different cases and this is done by
+                # making sure their candidate solution lists have intersection and that the sets belonging
+                # to one solution ar indeed either similar or have an intersection
+
+
+
+
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop
@@ -162,12 +240,12 @@ class Inductive(TaskManager):
     def screen_case(self):
         if self.dimension_status =='deduced':
             for check_routine in self.check_routine_list:
-                try_it, what_to_apply = check_routine[1]
+                try_it, what_to_apply, pass_info = check_routine[1]
                 if try_it:
                     indices = [i for i, tupl in enumerate(self.apply_routine_list) if tupl[0] == what_to_apply]
                     if len(indices) == 1:
                         indices = indices.pop()
-                        current_situation, train_situation, train_screen, test_situation, test_screen = self.try_apply_routines(what_to_apply, self.apply_routine_list[indices][1])
+                        current_situation, train_situation, train_screen, test_situation, test_screen = self.try_apply_routines(what_to_apply, self.apply_routine_list[indices][1], pass_info)
                         if current_situation in ['passed_all_traininputs', 'passed_some_traininputs', 'passed_all_testinputs', 'passed_some_testinputs']:
                             self.apply_routine_list[indices] = (self.apply_routine_list[indices][0], self.apply_routine_list[indices][1], current_situation)
                         if current_situation == 'passed_all_testinputs':
