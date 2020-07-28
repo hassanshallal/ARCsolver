@@ -195,15 +195,38 @@ class Inductive(TaskManager):
 #                                2) massage test_objective using the global running_objective
 # apply running_objective: input prior_knowledge, cur_preds, output: applied_cur_preds (for train or for test)
 
-    def is_complete_sub_objective(sub_objective):
+    def is_complete_sub_objective(self, sub_objective):
             return len(sub_objective) != 2
+
+    def test_consistency(self):
+        len_list = [len(x) for x in self.running_objective]
+        lead_index = len_list.index(max(len_list))
+        lead_objective = self.running_objective[lead_index]
+        #print('lead_objective: ', lead_objective)
+        consistency_measure = [None] * len(self.running_objective)
+        consistency_measure[lead_index] = True
+        #print(consistency_measure)
+        for n in range(len(self.running_objective)):
+            if n != lead_index:
+                #print('test_objective: ', this_task.running_objective[n])
+                this_case_consistency = [None] * len(self.running_objective[n])
+                #print('this_case_consistency: ', this_case_consistency)
+                for m in range(len(self.running_objective[n])):
+                    if self.running_objective[n][m] not in lead_objective: # replace with a less stringent condition and modify your lead objective on the fly
+                        this_case_consistency[m] = False
+                    else:
+                        this_case_consistency[m] = True
+                    #print('this_case_consistency: ', this_case_consistency)
+                consistency_measure[n] = all(this_case_consistency)
+            #print(consistency_measure)
+        return all(consistency_measure), lead_objective
 
     def validate_running_objective(self):
         if self.objective_status == 'obd' and self.dimension_status == 'deduced' and self.running_objective != self.objective:
             # test for completeness and for consistency of self.running_objective
             # In this case, we just want completeness to apply, in other cases, we'll need consistency in addition to completeness
             cur_lead = self.running_objective[0]
-            is_complete = all([is_complete_sub_objective(x) for x in cur_lead])
+            is_complete = all([self.is_complete_sub_objective(x) for x in cur_lead])
 
             self.running_test_objective = [self.running_objective[0]] * len(self.cur_test_preds)
             return
@@ -212,16 +235,18 @@ class Inductive(TaskManager):
             # here we need all training cases to be completeness
             task_completeness = []
             for case in self.running_objective:
-                task_completeness.append(all([is_complete_sub_objective(x) for x in case]))
+                task_completeness.append(all([self.is_complete_sub_objective(x) for x in case]))
 
             if all(task_completeness):
                 # test consistency of similar objectives among different cases and this is done by
                 # making sure their candidate solution lists have intersection and that the sets belonging
                 # to one solution ar indeed either similar or have an intersection
-
-
-
-
+                is_consistent, lead_objective = self.test_consistency()
+                if is_consistent:
+                    self.running_test_objective = [lead_objective] * len(self.cur_test_preds)
+                    return
+        self.running_test_objective = self.test_objective
+        return
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop
