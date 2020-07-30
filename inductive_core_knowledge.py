@@ -198,6 +198,42 @@ class Inductive(TaskManager):
     def is_complete_sub_objective(self, sub_objective):
             return len(sub_objective) != 2
 
+    # def trickle_down_lead_objective(lead_objective, other_objectives)
+    # comnine with completeness and apply globally on obd, red, irr (abstraction baby abstaction)
+    # basically it finds intersections of solution lists and confirms thier options_sets are similar
+    # This is a level of consistency that should work for red and even obd objective_status cases which are no consistent
+    # because of redundancy in the stable arm of the objective. This is abstraction in action, simple, quick, and clean.
+    
+
+    # intersection [6], [6] : solution lists
+    # union({15} + {8, 15}) AND union({0}, {0})
+    # loose arm has more options whereas tight arm has usually one option
+    # two objectives with common signal may even differ in the component arms: 128 irr!
+
+    # [[('bg', 'bg'), ('bg', 'nonbg0pr'), [6], (6, {15}, {0})]]
+    # [[('bg', 'bg'), ('bg', 'nonbg0pr'), [6], (6, {8, 15}, {0})]]
+
+    # [('nonbg0pr', 'nonbg0pr'), ('nonbg0pr', 'nonbg2pr'), [6, 7], (6, {15}, {0}), (7, {2}, {1})]
+    # [('nonbg0pr', 'nonbg0pr'), ('nonbg0pr', 'nonbg2pr'), [6, 7], (6, {15}, {0}), (7, {2}, {1})]
+    # [('nonbg0pr', 'nonbg0pr'), ('nonbg0pr', 'nonbg2pr'), [6], (6, {4, 15}, {0})]
+
+    # [('nonbg3', 'nonbg3'), ('nonbg3', 'nonbg2pr'), [6], (6, {8, 3, 4, 15}, {0})]
+    # [('nonbg3', 'nonbg3'), ('nonbg3', 'nonbg2pr'), [6], (6, {8, 3, 4, 15}, {0})]
+
+    # [('bg', 'nonbg0pr'), ('bg', 'nonbg1pr'), [6], (6, {0}, {5, 15})]
+    # [('bg', 'nonbg0pr'), ('bg', 'nonbg1pr'), [6], (6, {0}, {11, 12})]
+
+    #  [('nonbg0', 'nil', 'direct')], [('nonbg1', 'nonbg1', 'direct'), [1, 4, 5], (1, {8}), (4, {14}), (5, {1})]
+    #  [('nonbg0', 'nil', 'direct')], [('nonbg1', 'nonbg1', 'direct'), [1, 4, 5], (1, {7}), (4, {16}), (5, {1})]
+    #  [('nonbg0', 'nil', 'direct')], [('nonbg1', 'nonbg1', 'direct'), [1, 4, 5, 6], (1, {4}), (4, {22}), (5, {1}), (6, {2})]
+
+    # Notice the (5, {2}) that is common in all obectives of 128 which is irr
+    # [[('nonbg-1pr', 'nonbg-1pr', 'direct'), [1, 4, 5, 7], (1, {4}), (4, {3}), (5, {2}), (7, {5})
+    # [('nonbg-1pr', 'nonbg3', 'direct'), [1, 4, 5, 6], (1, {9}), (4, {3}), (5, {2}), (6, {8})]
+
+    #  [[('bg', 'nil', 'direct')], [('nonbg0', 'nonbg0', 'direct'), [1, 4, 5], (1, {1}), (4, {2}), (5, {0})]]
+    #  [[('bg', 'nil', 'direct')], [('nonbg0', 'nonbg0', 'direct'), [1, 4, 5, 6],  (1, {2}), (4, {3}), (5, {0}), (6, {15})]]
+    
     def test_consistency(self):
         len_list = [len(x) for x in self.running_objective]
         lead_index = len_list.index(max(len_list))

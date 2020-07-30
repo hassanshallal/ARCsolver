@@ -46,7 +46,7 @@ def load_set(path):
     tasks = sorted(os.listdir(path))
 
     for n in tasks:
-        task_file = str(path / n)
+        task_file = str(path +  "\\" + n)
 
         with open(task_file, 'r') as f:
             task = json.load(f)
