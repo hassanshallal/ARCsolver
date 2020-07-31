@@ -35,7 +35,7 @@ class Inductive(TaskManager):
         # get prior knowledge
         self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_features()
         self.running_objective = [self.sets_obj_on_train(x_train, y_train, objec) for x_train, y_train, objec in zip(self.cur_x_train, self.cur_y_train, self.objective)]
-        self.running_test_objective = self.validate_running_objective()
+        self.is_complete_objective, self.test_running_objective = self.validate_running_objective()
 
         self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips(self.cur_train_preds, self.trainoutputs)), ('check_unique_output', check_unique_output(self.cur_train_preds, self.trainoutputs, self.bg_in_unique_train_outputs, self.bg))]
         self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output_frequency', apply_unique_output_frequency, 'ineligible')]
@@ -189,101 +189,19 @@ class Inductive(TaskManager):
 
         return objective
 
-# validate running_objective: complete: each sub_objective of each training case has found a working strategy
-#                             consistent: there is a common mechanism for each sub_objective among all train retrieve_coords_from_assignments
-#                             if complete and consistent:
-#                                1) create a global running_objective (complete with consistently tackled objectives)
-#                                2) massage test_objective using the global running_objective
-# apply running_objective: input prior_knowledge, cur_preds, output: applied_cur_preds (for train or for test)
-
-    def is_complete_sub_objective(self, sub_objective):
-            return len(sub_objective) != 2
-
-    # def trickle_down_lead_objective(lead_objective, other_objectives)
-    # comnine with completeness and apply globally on obd, red, irr (abstraction baby abstaction)
-    # basically it finds intersections of solution lists and confirms thier options_sets are similar
-    # This is a level of consistency that should work for red and even obd objective_status cases which are no consistent
-    # because of redundancy in the stable arm of the objective. This is abstraction in action, simple, quick, and clean.
     
-
-    # intersection [6], [6] : solution lists
-    # union({15} + {8, 15}) AND union({0}, {0})
-    # loose arm has more options whereas tight arm has usually one option
-    # two objectives with common signal may even differ in the component arms: 128 irr!
-
-    # [[('bg', 'bg'), ('bg', 'nonbg0pr'), [6], (6, {15}, {0})]]
-    # [[('bg', 'bg'), ('bg', 'nonbg0pr'), [6], (6, {8, 15}, {0})]]
-
-    # [('nonbg0pr', 'nonbg0pr'), ('nonbg0pr', 'nonbg2pr'), [6, 7], (6, {15}, {0}), (7, {2}, {1})]
-    # [('nonbg0pr', 'nonbg0pr'), ('nonbg0pr', 'nonbg2pr'), [6, 7], (6, {15}, {0}), (7, {2}, {1})]
-    # [('nonbg0pr', 'nonbg0pr'), ('nonbg0pr', 'nonbg2pr'), [6], (6, {4, 15}, {0})]
-
-    # [('nonbg3', 'nonbg3'), ('nonbg3', 'nonbg2pr'), [6], (6, {8, 3, 4, 15}, {0})]
-    # [('nonbg3', 'nonbg3'), ('nonbg3', 'nonbg2pr'), [6], (6, {8, 3, 4, 15}, {0})]
-
-    # [('bg', 'nonbg0pr'), ('bg', 'nonbg1pr'), [6], (6, {0}, {5, 15})]
-    # [('bg', 'nonbg0pr'), ('bg', 'nonbg1pr'), [6], (6, {0}, {11, 12})]
-
-    #  [('nonbg0', 'nil', 'direct')], [('nonbg1', 'nonbg1', 'direct'), [1, 4, 5], (1, {8}), (4, {14}), (5, {1})]
-    #  [('nonbg0', 'nil', 'direct')], [('nonbg1', 'nonbg1', 'direct'), [1, 4, 5], (1, {7}), (4, {16}), (5, {1})]
-    #  [('nonbg0', 'nil', 'direct')], [('nonbg1', 'nonbg1', 'direct'), [1, 4, 5, 6], (1, {4}), (4, {22}), (5, {1}), (6, {2})]
-
-    # Notice the (5, {2}) that is common in all obectives of 128 which is irr
-    # [[('nonbg-1pr', 'nonbg-1pr', 'direct'), [1, 4, 5, 7], (1, {4}), (4, {3}), (5, {2}), (7, {5})
-    # [('nonbg-1pr', 'nonbg3', 'direct'), [1, 4, 5, 6], (1, {9}), (4, {3}), (5, {2}), (6, {8})]
-
-    #  [[('bg', 'nil', 'direct')], [('nonbg0', 'nonbg0', 'direct'), [1, 4, 5], (1, {1}), (4, {2}), (5, {0})]]
-    #  [[('bg', 'nil', 'direct')], [('nonbg0', 'nonbg0', 'direct'), [1, 4, 5, 6],  (1, {2}), (4, {3}), (5, {0}), (6, {15})]]
-    
-    def test_consistency(self):
+    def validate_running_objective(self):
         len_list = [len(x) for x in self.running_objective]
         lead_index = len_list.index(max(len_list))
+
         lead_objective = self.running_objective[lead_index]
-        #print('lead_objective: ', lead_objective)
-        consistency_measure = [None] * len(self.running_objective)
-        consistency_measure[lead_index] = True
-        #print(consistency_measure)
-        for n in range(len(self.running_objective)):
+        for n in range(len(self.running_objective)):       
             if n != lead_index:
-                #print('test_objective: ', this_task.running_objective[n])
-                this_case_consistency = [None] * len(self.running_objective[n])
-                #print('this_case_consistency: ', this_case_consistency)
-                for m in range(len(self.running_objective[n])):
-                    if self.running_objective[n][m] not in lead_objective: # replace with a less stringent condition and modify your lead objective on the fly
-                        this_case_consistency[m] = False
-                    else:
-                        this_case_consistency[m] = True
-                    #print('this_case_consistency: ', this_case_consistency)
-                consistency_measure[n] = all(this_case_consistency)
-            #print(consistency_measure)
-        return all(consistency_measure), lead_objective
-
-    def validate_running_objective(self):
-        if self.objective_status == 'obd' and self.dimension_status == 'deduced' and self.running_objective != self.objective:
-            # test for completeness and for consistency of self.running_objective
-            # In this case, we just want completeness to apply, in other cases, we'll need consistency in addition to completeness
-            cur_lead = self.running_objective[0]
-            is_complete = all([self.is_complete_sub_objective(x) for x in cur_lead])
-
-            self.running_test_objective = [self.running_objective[0]] * len(self.cur_test_preds)
-            return
-
-        elif self.objective_status == 'red' and self.dimension_status == 'deduced' and self.running_objective != self.objective:
-            # here we need all training cases to be completeness
-            task_completeness = []
-            for case in self.running_objective:
-                task_completeness.append(all([self.is_complete_sub_objective(x) for x in case]))
-
-            if all(task_completeness):
-                # test consistency of similar objectives among different cases and this is done by
-                # making sure their candidate solution lists have intersection and that the sets belonging
-                # to one solution ar indeed either similar or have an intersection
-                is_consistent, lead_objective = self.test_consistency()
-                if is_consistent:
-                    self.running_test_objective = [lead_objective] * len(self.cur_test_preds)
-                    return
-        self.running_test_objective = self.test_objective
-        return
+                current_sub = self.running_objective[n]
+                for x in range(len(current_sub)):
+                    for y in range(len(lead_objective)):
+                        lead_objective[y] = merge_sub_objectives(current_sub[x], lead_objective[y])
+        return all([is_complete_sub_objective(x) for x in lead_objective]), lead_objective
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
     # routines on samples to decide whether to send a positive or a negative feedback so as to stop

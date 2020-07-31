@@ -260,3 +260,43 @@ def featurize_prior_knowledge_test(in_p_k):
             x.append(in_p_k[:, n, m].tolist())
 
     return np.array(x, dtype = object)
+
+
+def merge_sub_objectives(sub_test, sub_lead):
+    if len(sub_test[0]) == 2 and len(sub_test) > 2 and len(sub_lead) > 2 and sub_test[0:2] == sub_lead[0:2]:
+        intersect = sorted(list(set(sub_test[2]).intersection(set(sub_lead[2]))))
+        merger = [sub_lead[0], sub_lead[1], intersect]
+        for n in intersect:
+            in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
+            in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
+            new_sit = (n, in_sub_test[0][1].union(in_sub_lead[0][1]), in_sub_test[0][2].union(in_sub_lead[0][2]))
+            merger.append(new_sit)
+        return merger
+    elif len(sub_test[0]) == 3 and  len(sub_test) > 1 and len(sub_lead) > 1 and sub_test[0] == sub_lead[0]:
+        intersect = sorted(list(set(sub_test[1]).intersection(set(sub_lead[1]))))
+        merger = [sub_lead[0], intersect]
+        for n in intersect:
+            in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
+            in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
+            new_sit = (n, in_sub_test[0][1].union(in_sub_lead[0][1]))
+            merger.append(new_sit)
+        return merger
+    elif len(sub_test[0]) == 3 and  len(sub_test) > 1 and len(sub_lead) > 1 and sub_test[0] != sub_lead[0]:
+        intersect = sorted(list(set(sub_test[1]).intersection(set(sub_lead[1]))))
+        common = [x for x in sub_test if x in sub_lead]
+        if len(common) > 0:
+            intersects = [x for x in intersect if x in [y[0] for y in common]]
+            merger = [sub_test[0], sub_lead[0], intersects] + common
+            return merger
+        elif len(common) == 0:
+            merger = [sub_test[0], sub_lead[0]]
+            return merger
+        
+    elif len(sub_test[0]) == 3 and len(sub_test) == 1 and sub_test[0] == sub_lead[0]:
+        return sub_lead
+    else:
+        return sub_lead
+
+def is_complete_sub_objective(sub_objective):
+            return len(sub_objective) != 2
+    

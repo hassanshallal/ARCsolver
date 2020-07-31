@@ -1,5 +1,6 @@
 from inductive_core_knowledge import *
-training_path = 'C:\\Users\\12092\\Downloads\\ARCsolver_master\\data\\training'
+# training_path = 'C:\\Users\\12092\\Desktop\\ARCsolver\\data\\training'
+training_path = training_path = '/home/hshallal/Desktop/ARCsolver/data/training'
 tt = load_set(training_path)
 print(len(tt))
 
