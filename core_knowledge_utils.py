@@ -334,3 +334,76 @@ def merge_sub_objectives(sub_test, sub_lead):
 def is_complete_sub_objective(sub_objective):
             return len(sub_objective) != 2
     
+    
+    
+def is_all_nonbg_ass_leads(this_obj):
+    for x in this_obj:
+        if type(x) == tuple and x[0] in ['bg', 'nil']:
+            return False, x[0]
+    return True, 'nonbg'
+
+def is_match(extra_sub, global_obj_sub):
+    extra_sub_all_nonbg, extra_sub_sit = is_all_nonbg_ass_leads(extra_sub)
+    global_obj_sub_all_nonbg, global_obj_sub_sit = is_all_nonbg_ass_leads(global_obj_sub)
+    if len(extra_sub[0]) == len(extra_sub[1]) and extra_sub_sit == global_obj_sub_sit:
+        return True
+    return False
+
+def normalize_tuple(this_tuple):
+    new_tuple = []
+    for n in this_tuple:
+        if 'pr' in n:
+            new_tuple.append(n)
+        elif 'pr' not in n and any(map(str.isdigit, n)):
+            new_tuple.append(''.join([i for i in n if not i.isdigit()]))
+        else:
+            new_tuple.append(n)
+    return tuple(new_tuple)
+
+def normalize_sub_obj(sub_obj):
+    if len(sub_obj) >= 2 and len(sub_obj[0]) == 2:
+        return [normalize_tuple(sub_obj[0]), normalize_tuple(sub_obj[1])]
+    elif len(sub_obj) >= 1 and len(sub_obj[0]) == 3:
+        return [normalize_tuple(sub_obj[0])]
+    
+def enforce_global_objective(test_objective, global_objective):
+    # Find whether any test sub_obj is not exixtent oin the global objective
+    for n in range(len(test_objective)):
+        this_test_objective = test_objective[n]
+        included_in_test = []
+        for x in range(len(this_test_objective)):
+            for y in range(len(global_objective)):
+                test_len = len(this_test_objective[x])
+                if len(global_objective[y]) >= test_len and global_objective[y][0:test_len] == this_test_objective[x]:
+                    included_in_test.append(x)       
+                    
+        not_included = [l for l in range(len(this_test_objective)) if l not in included_in_test]
+        #print('not_included:',not_included)
+        # adjust global_objective to allow not included test sub objectives
+        if len(not_included) == 0:
+            return global_objective
+        else:
+            #print(not_included)
+            for to_massage in not_included:
+                this_extra = this_test_objective[to_massage] # [('nonbg4', 'nonbg4'), ('nonbg4', 'bg')]
+                #print('this_extra:', this_extra)
+                normalized_extra = normalize_sub_obj(this_extra)
+                #print('normalized_extra:', normalized_extra)
+                normalized_global_objective = [normalize_sub_obj(x) for x in global_objective]
+                #print('normalized_global_objective:', normalized_global_objective)
+                matches = [x == normalized_extra for x in normalized_global_objective]
+                #print('matches:', matches)
+                if any(matches):
+                    #print('any(matches):', any(matches))
+                    any_match = matches.index(True)
+                    if len(this_extra) == 2:
+                        #print('not added:', global_objective[any_match][2:len(global_objective[any_match])])
+                        this_extra = this_extra + global_objective[any_match][2:len(global_objective[any_match])]
+                        global_objective.append(this_extra)
+                    elif len(this_extra) == 1:
+                        #print('not added:', global_objective[any_match][1:len(global_objective[any_match])])
+                        this_extra = this_extra + global_objective[any_match][1:len(global_objective[any_match])]
+                        global_objective.append(this_extra)
+
+            return global_objective   
+    

@@ -35,7 +35,7 @@ class Inductive(TaskManager):
         # get prior knowledge
         self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_features()
         self.running_objective = [self.sets_obj_on_train(x_train, y_train, objec) for x_train, y_train, objec in zip(self.cur_x_train, self.cur_y_train, self.objective)]
-        self.is_complete_objective, self.global_objective = self.validate_running_objective()
+        self.is_complete_objective, self.global_objective = self.globalize_objective()
 
         self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips(self.cur_train_preds, self.trainoutputs)), ('check_unique_output', check_unique_output(self.cur_train_preds, self.trainoutputs, self.bg_in_unique_train_outputs, self.bg))]
         self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output_frequency', apply_unique_output_frequency, 'ineligible')]
@@ -190,7 +190,8 @@ class Inductive(TaskManager):
         return objective
 
     
-    def validate_running_objective(self):
+    def globalize_objective(self):
+        # validate and compile on a train level
         len_list = [len(x) for x in self.running_objective]
         lead_index = len_list.index(max(len_list))
 
@@ -201,6 +202,9 @@ class Inductive(TaskManager):
                 for x in range(len(current_sub)):
                     for y in range(len(lead_objective)):
                         lead_objective[y] = merge_sub_objectives(current_sub[x], lead_objective[y])
+                        
+        # Use the information in the test so as to further prepare the global_objective
+        lead_objective = enforce_global_objective(self.test_objective, lead_objective)
         return all([is_complete_sub_objective(x) for x in lead_objective]), lead_objective
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path
