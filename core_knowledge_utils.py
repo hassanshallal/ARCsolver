@@ -263,33 +263,67 @@ def featurize_prior_knowledge_test(in_p_k):
 
 
 def merge_sub_objectives(sub_test, sub_lead):
+#     print('sub_test:', sub_test)
+#     print('sub_lead:', sub_lead)
     if len(sub_test[0]) == 2 and len(sub_test) > 2 and len(sub_lead) > 2 and sub_test[0:2] == sub_lead[0:2]:
         intersect = sorted(list(set(sub_test[2]).intersection(set(sub_lead[2]))))
-        merger = [sub_lead[0], sub_lead[1], intersect]
-        for n in intersect:
-            in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
-            in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
-            new_sit = (n, in_sub_test[0][1].union(in_sub_lead[0][1]), in_sub_test[0][2].union(in_sub_lead[0][2]))
-            merger.append(new_sit)
+        #print('intersect:', intersect)
+        if len(intersect) > 0:
+            merger = [sub_lead[0], sub_lead[1], intersect]
+            #print('merger 0:', merger)
+            to_remove = []
+            for n in intersect:
+                in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
+                in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
+                first = in_sub_test[0][1].union(in_sub_lead[0][1])
+                second = in_sub_test[0][2].union(in_sub_lead[0][2])
+                #print('first: ', first)
+                #print('second: ', second)
+                if len(first.intersection(second)) == 0:
+                    new_sit = (n, first, second)
+                    merger.append(new_sit)
+                else:
+                    to_remove.append(n)
+            merger[2] = [x for x in merger[2] if x not in to_remove]
+            
+            if len(merger) > 3:
+                #print('got all')
+                return merger
+            else:
+                #print('truncated objectve')
+                merger = [sub_lead[0], sub_lead[1]]
+                return merger
+        else:
+            merger = [sub_lead[0], sub_lead[1]]
+            return merger
+    elif len(sub_test[0]) == 2 and len(sub_test[0]) == 2 and len(sub_lead) > 2 and sub_test[0:2] == sub_lead[0:2]:
+        merger = [sub_test[0], sub_test[1]]
         return merger
+        
+        
     elif len(sub_test[0]) == 3 and  len(sub_test) > 1 and len(sub_lead) > 1 and sub_test[0] == sub_lead[0]:
         intersect = sorted(list(set(sub_test[1]).intersection(set(sub_lead[1]))))
-        merger = [sub_lead[0], intersect]
-        for n in intersect:
-            in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
-            in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
-            new_sit = (n, in_sub_test[0][1].union(in_sub_lead[0][1]))
-            merger.append(new_sit)
-        return merger
+        if len(intersect) > 0:
+            merger = [sub_lead[0], intersect]
+            for n in intersect:
+                in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
+                in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
+                new_sit = (n, in_sub_test[0][1].union(in_sub_lead[0][1]))
+                merger.append(new_sit)
+            return merger
+        else:
+            merger = [sub_lead[0]]
+            return merger
+        
     elif len(sub_test[0]) == 3 and  len(sub_test) > 1 and len(sub_lead) > 1 and sub_test[0] != sub_lead[0]:
         intersect = sorted(list(set(sub_test[1]).intersection(set(sub_lead[1]))))
         common = [x for x in sub_test if x in sub_lead]
-        if len(common) > 0:
+        if len(common) > 0 and len(intersect) > 0:
             intersects = [x for x in intersect if x in [y[0] for y in common]]
             merger = [sub_test[0], sub_lead[0], intersects] + common
             return merger
-        elif len(common) == 0:
-            merger = [sub_test[0], sub_lead[0]]
+        else:
+            merger = [sub_lead[0]]
             return merger
         
     elif len(sub_test[0]) == 3 and len(sub_test) == 1 and sub_test[0] == sub_lead[0]:

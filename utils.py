@@ -716,6 +716,13 @@ def is_all_nonbg_in_cur_obj(Current_objective):
                 return False
     return True
 
+def is_all_nonbg_in_sub_obj(this_obj):
+    for x in this_obj:
+        if type(x) == tuple and x[0] == 'bg':
+            return False
+    return True
+
+
 def get_bare_assignment_leads(assignments_leads):
     bare_assignment_leads = set()
     for n in assignments_leads:

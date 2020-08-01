@@ -35,7 +35,7 @@ class Inductive(TaskManager):
         # get prior knowledge
         self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_features()
         self.running_objective = [self.sets_obj_on_train(x_train, y_train, objec) for x_train, y_train, objec in zip(self.cur_x_train, self.cur_y_train, self.objective)]
-        self.is_complete_objective, self.test_running_objective = self.validate_running_objective()
+        self.is_complete_objective, self.global_objective = self.validate_running_objective()
 
         self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips(self.cur_train_preds, self.trainoutputs)), ('check_unique_output', check_unique_output(self.cur_train_preds, self.trainoutputs, self.bg_in_unique_train_outputs, self.bg))]
         self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output_frequency', apply_unique_output_frequency, 'ineligible')]
@@ -166,13 +166,13 @@ class Inductive(TaskManager):
             for obj in objective:
                 if len(obj) == 2:
                     is_opprtunity = [len(x.intersection(y)) == 0 for x, y in zip(sets_dict[obj[0]], sets_dict[obj[1]])]
-                    #print('is_opprtunity: ', is_opprtunity)
+                    
                     if any(is_opprtunity):
-                        columns = [i+1 for i in range(len(is_opprtunity)) if is_opprtunity[i]]
-                        #print('columns: ', columns)
-                        obj.append(columns)
-                        for opp in obj[2]:
-                            obj.append((opp, sets_dict[obj[0]][opp-1], sets_dict[obj[1]][opp-1]))
+                        columns = [i+1 for i in range(len(is_opprtunity)) if is_opprtunity[i]]                       
+                        if len(columns) > 0:
+                            obj.append(columns)
+                            for opp in columns:
+                                obj.append((opp, sets_dict[obj[0]][opp-1], sets_dict[obj[1]][opp-1]))
 
             # for cases with unique output
             for obj in objective:
@@ -186,7 +186,7 @@ class Inductive(TaskManager):
                             obj.append(columns)
                             for opp in obj[1]:
                                 obj.append((opp, sets_dict['any_opp'][opp-1]))
-
+                                
         return objective
 
     
