@@ -299,12 +299,17 @@ def merge_sub_objectives(sub_test, sub_lead):
     elif len(sub_test[0]) == 2 and len(sub_test[0]) == 2 and len(sub_lead) > 2 and sub_test[0:2] == sub_lead[0:2]:
         merger = [sub_test[0], sub_test[1]]
         return merger
-        
-        
-    elif len(sub_test[0]) == 3 and  len(sub_test) > 1 and len(sub_lead) > 1 and sub_test[0] == sub_lead[0]:
+    
+    # From here, always consider cases 99, 128, 338, mainly `128, we extend and hope this fix 345
+    elif len(sub_test[0]) == 3 and len(sub_lead[0]) >= 3 and len(sub_test) > 1 and len(sub_lead) > 1 and sub_test[0][0] == sub_lead[0][0] and sub_test[0][2] == list(sub_lead[0])[len(sub_lead[0])-1]:
+        if sub_test[0][1] not in list(sub_lead[0])[1:len(sub_lead[0])]:
+            modified_lead_tuple = tuple([sub_test[0][0], sub_test[0][1]] + list(sub_lead[0])[1:len(sub_lead[0])])
+        else:
+            modified_lead_tuple = sub_lead[0]
+            
         intersect = sorted(list(set(sub_test[1]).intersection(set(sub_lead[1]))))
         if len(intersect) > 0:
-            merger = [sub_lead[0], intersect]
+            merger = [modified_lead_tuple, intersect]
             for n in intersect:
                 in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
                 in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
@@ -312,28 +317,13 @@ def merge_sub_objectives(sub_test, sub_lead):
                 merger.append(new_sit)
             return merger
         else:
-            merger = [sub_lead[0]]
-            return merger
-        
-    elif len(sub_test[0]) == 3 and  len(sub_test) > 1 and len(sub_lead) > 1 and sub_test[0] != sub_lead[0]:
-        intersect = sorted(list(set(sub_test[1]).intersection(set(sub_lead[1]))))
-        common = [x for x in sub_test if x in sub_lead]
-        if len(common) > 0 and len(intersect) > 0:
-            intersects = [x for x in intersect if x in [y[0] for y in common]]
-            merger = [sub_test[0], sub_lead[0], intersects] + common
-            return merger
-        else:
-            merger = [sub_lead[0]]
-            return merger
-        
-    elif len(sub_test[0]) == 3 and len(sub_test) == 1 and sub_test[0] == sub_lead[0]:
-        return sub_lead
+            merger = [modified_lead_tuple]
+            return merger  
     else:
         return sub_lead
-
+        
 def is_complete_sub_objective(sub_objective):
             return len(sub_objective) != 2
-    
     
     
 def is_all_nonbg_ass_leads(this_obj):

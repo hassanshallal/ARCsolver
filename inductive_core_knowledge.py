@@ -196,15 +196,20 @@ class Inductive(TaskManager):
         lead_index = len_list.index(max(len_list))
 
         lead_objective = self.running_objective[lead_index]
+        
+        #print('lead_objective before merging: ', lead_objective)    
         for n in range(len(self.running_objective)):       
             if n != lead_index:
                 current_sub = self.running_objective[n]
+                #print('current_sub: ', current_sub)
                 for x in range(len(current_sub)):
                     for y in range(len(lead_objective)):
                         lead_objective[y] = merge_sub_objectives(current_sub[x], lead_objective[y])
-                        
+                        #print('lead_objective: ', lead_objective)
+        #print('lead_objective before enforcing global: ', lead_objective)              
         # Use the information in the test so as to further prepare the global_objective
         lead_objective = enforce_global_objective(self.test_objective, lead_objective)
+        #print('lead_objective after enforcing global: ', lead_objective)
         return all([is_complete_sub_objective(x) for x in lead_objective]), lead_objective
 
     def inductive_strategy(self): # we will change this into a multilane highway and a find_path

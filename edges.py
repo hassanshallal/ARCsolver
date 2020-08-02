@@ -1,6 +1,5 @@
 from utils import *
 
-
 def get_edge_access_space(l):
     all_combs = set()
     for n in l:
