@@ -12,8 +12,6 @@ results_dict['passed_some_testinputs'] = []
 results_dict['unpassed_all_testinputs'] = []
 results_dict['unknown'] = []
 
-
-
 # hard coding the process of testing intersections among keys-values
 def find_intersection_keys_values(this_map):
     keys_set = set(this_map.keys())
@@ -91,6 +89,15 @@ def check_unique_output(cur_train_preds, trainoutputs, bg_in_unique_train_output
 
     return  outcome, what_to_try, to_pass
 
+# 'check_scenarios', self.pr_kn_apply_scenarios != None
+def check_scenarios(pr_kn_apply_scenarios):
+    if pr_kn_apply_scenarios != None:
+        return True, 'apply_scenarios', {}
+    else:
+        return False, '', {}
+    
+    
+    
 def apply_unique_output_frequency(cur_preds, output_dim_preds, pass_info): # 128, 99, 338
     freq_graph = get_frequency_graph([Counter(list(itertools.chain.from_iterable(x.tolist()))).most_common() for x in cur_preds], pass_info['bg_in_unique_train_outputs'], pass_info['bg'])
 
@@ -161,6 +168,40 @@ def apply_direct_transformation(in_, color_to_token, objective, token_to_color, 
             change_dict[obj[0][0]] = obj[0][1]
 
     y = apply_transform_map(x, change_dict)
+    z = apply_transform_map(y, token_to_color)
+    return z
+
+def apply_scenarios(pr_knowledge_input, pr_kn_apply_scenarios, token_to_color, pass_info):
+    # get the tokenized starter
+    y = deepcopy(pr_knowledge_input[0])
+    
+    # organize scenarios based on leads
+    leads = [x[0] for x in pr_kn_apply_scenarios]
+    leads_scenarios = {}
+    for k in leads:
+        leads_scenarios[k] = [x for x in pr_kn_apply_scenarios if x[0] == k]
+        
+    for m in range(y.shape[0]):
+        for n in range(y.shape[1]):
+            if y[m][n] in leads_scenarios.keys():
+                playgrounds = leads_scenarios[y[m][n]]
+                for playground in playgrounds:
+                    if playground[1] == 'direct':
+                        y[m][n] = playground[2]
+                    elif len(playground) == 4:
+                        if 'not' not in playground[2] and pr_knowledge_input[playground[1]][m][n] in playground[2]:
+                            y[m][n] = playground[3]
+                        elif 'not' in playground[2] and pr_knowledge_input[playground[1]][m][n] not in playground[2]:
+                            y[m][n] = playground[3]
+                            
+                    elif len(playground) > 4:
+                        current_options = [x for x in playground if type(x) != str]
+                        kn_indices = [i for i in range(len(current_options)) if i % 2 == 0]
+                        vals_indices = [i for i in range(len(current_options)) if i % 2 != 0]
+                        test_all = np.all([pr_knowledge_input[current_options[x]][m][n] in current_options[y] for x, y in zip(kn_indices, vals_indices)])
+                        if test_all:
+                            y[m][n] = playground[len(playground) - 1]
+                            
     z = apply_transform_map(y, token_to_color)
     return z
 

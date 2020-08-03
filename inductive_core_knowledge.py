@@ -7,13 +7,11 @@ from fragmented_core_knowledge import *
 from edges import *
 from neighbors import *
 
-
 class Inductive(TaskManager):
     def __init__(self, raw_task, forced_bg = None):
         super().__init__(raw_task, forced_bg = None)
 
         self.fragmented_core_knowledge = Fragmented(self.cur_train_preds, self.trainoutputs, self.cur_test_preds, self.bg, self.testoutputs)
-        # self.dimensionWork = DimensionWork(self.communication, self.cur_test_preds)
         self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.fragmented_core_knowledge.get_dimension_cognified()
 
         self.fragmented_core_knowledge.carry_along_kwargs(dimension_status = self.dimension_status)
@@ -31,7 +29,6 @@ class Inductive(TaskManager):
         else:
             self.bg_in_unique_train_outputs = None
 
-
         # get prior knowledge
         self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_prior_knowledge()
         self.running_objective = [self.sets_obj_on_train(x_train, y_train, objec) for x_train, y_train, objec in zip(self.cur_x_train, self.cur_y_train, self.objective)]
@@ -41,8 +38,9 @@ class Inductive(TaskManager):
         else:
             self.pr_kn_apply_scenarios = None
         
-        self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips(self.cur_train_preds, self.trainoutputs)), ('check_unique_output', check_unique_output(self.cur_train_preds, self.trainoutputs, self.bg_in_unique_train_outputs, self.bg))]
-        self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output_frequency', apply_unique_output_frequency, 'ineligible')]
+        self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips(self.cur_train_preds, self.trainoutputs)), ('check_unique_output', check_unique_output(self.cur_train_preds, self.trainoutputs, self.bg_in_unique_train_outputs, self.bg)), ('check_scenarios', check_scenarios(self.pr_kn_apply_scenarios))]
+        self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output_frequency', apply_unique_output_frequency, 'ineligible'), ('apply_scenarios', apply_scenarios, 'ineligible')]
+# apply_scenarios(pr_knowledge_input, pr_kn_apply_scenarios, token_to_color)
 
         self.solved, self.mechanisms = 'unsolved', []
         self.current_situation, self.train_situation, self.train_screen, self.test_situation, self.test_screen = 'ineligible', [], [], [], []
@@ -76,7 +74,10 @@ class Inductive(TaskManager):
                 train_situation = [x[0](y, x[1]) for x, y in zip(routines, train_situation)]
         elif what_to_try == 'apply_unique_output_frequency':
             train_situation = apply_unique_output_frequency(self.cur_train_preds, self.train_output_dim_preds, pass_info)
-
+        elif what_to_try == 'apply_scenarios':
+            train_situation = [apply_routine(x, self.pr_kn_apply_scenarios, y, pass_info) for x, y in zip(self.cur_x_train, self.token_to_colors)]
+            
+# apply_scenarios(pr_knowledge_input, pr_kn_apply_scenarios, token_to_color)
         train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
 
         if all(train_screen):
@@ -94,6 +95,8 @@ class Inductive(TaskManager):
                     test_situation = [x[0](y, x[1]) for x, y in zip(routines, test_situation)]
             elif what_to_try == 'apply_unique_output_frequency':
                 test_situation = apply_unique_output_frequency(self.cur_test_preds, self.test_output_dim_preds, pass_info)
+            elif what_to_try == 'apply_scenarios':
+                test_situation = [apply_routine(x, self.pr_kn_apply_scenarios, y, pass_info) for x, y in zip(self.cur_x_test, self.test_token_to_colors)]
 
             if len(self.testoutputs) > 0:
                 test_screen = [np.array_equal(x, y) for x, y in zip(test_situation, self.testoutputs)]
@@ -187,7 +190,6 @@ class Inductive(TaskManager):
                                 obj.append((opp, sets_dict['any_opp'][opp-1]))
                                 
         return objective
-
     
     def globalize_objective(self):
         # validate and compile on a train level
@@ -204,16 +206,13 @@ class Inductive(TaskManager):
                 for x in range(len(current_sub)):
                     for y in range(len(lead_objective)):
                         lead_objective[y] = merge_sub_objectives(current_sub[x], lead_objective[y])
-                        #print('lead_objective: ', lead_objective)
-        #print('lead_objective before enforcing global: ', lead_objective)              
+                        
         # Use the information in the test so as to further prepare the global_objective
         lead_objective = enforce_global_objective(self.test_objective, lead_objective)
         #print('lead_objective after enforcing global: ', lead_objective)
         return all([is_complete_sub_objective(x) for x in lead_objective]), lead_objective
 
-    def inductive_strategy(self): # we will change this into a multilane highway and a find_path
-    # routines on samples to decide whether to send a positive or a negative feedback so as to stop
-        # try dimension related
+    def inductive_strategy(self): 
         self.solved, mechanisms,  this_testpred = self.fragmented_core_knowledge.screen_dimesnions()
         if self.solved == 'solved':
             self.current_situation = 'passed_all_testinputs'
