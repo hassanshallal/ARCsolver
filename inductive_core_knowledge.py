@@ -33,10 +33,14 @@ class Inductive(TaskManager):
 
 
         # get prior knowledge
-        self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_features()
+        self.cur_x_train, self.cur_y_train, self.cur_x_test = self.get_prior_knowledge()
         self.running_objective = [self.sets_obj_on_train(x_train, y_train, objec) for x_train, y_train, objec in zip(self.cur_x_train, self.cur_y_train, self.objective)]
         self.is_complete_objective, self.global_objective = self.globalize_objective()
-
+        if self.is_complete_objective:
+            self.pr_kn_apply_scenarios = get_final_scenarios(self.global_objective)
+        else:
+            self.pr_kn_apply_scenarios = None
+        
         self.check_routine_list = [('check_value_maps', check_value_maps(self.couple_val_map)), ('check_flips', check_flips(self.cur_train_preds, self.trainoutputs)), ('check_unique_output', check_unique_output(self.cur_train_preds, self.trainoutputs, self.bg_in_unique_train_outputs, self.bg))]
         self.apply_routine_list = [('apply_value_maps', apply_value_maps, 'ineligible'), ('apply_direct_transformation', apply_direct_transformation, 'ineligible'), ('apply_flips', screen_flips_rotation, 'ineligible'), ('apply_unique_output_frequency', apply_unique_output_frequency, 'ineligible')]
 
@@ -121,11 +125,6 @@ class Inductive(TaskManager):
         traininputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_train_preds, bg_train, self.color_to_tokens)]
         testinputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_test_preds, bg_test, self.test_color_to_tokens)]
         trainoutputs_tokenized = [apply_transform_map(x, y) for x, y in zip(self.trainoutputs, self.color_to_tokens)]
-        return traininputs_prkn, trainoutputs_tokenized, testinputs_prkn
-
-
-    def get_features(self):
-        traininputs_prkn, trainoutputs_tokenized, testinputs_prkn  = self.get_prior_knowledge()
         return traininputs_prkn, trainoutputs_tokenized, testinputs_prkn
 
     def sets_obj_on_train(self, cur_x_train, cur_y_train, this_objective):

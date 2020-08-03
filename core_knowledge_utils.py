@@ -232,7 +232,7 @@ def build_prior_knowledge(in_, bg, color_to_token):
     edge_situation = get_edge_situation(in_, bg)
     neighbor_situation = neighbor_situation_whole(in_)
 
-    return np.stack((tokenized_graph, in_, x_situation, y_situation, frequency_graph, sorted_frequency_graph, edge_situation, neighbor_situation), axis = 0)
+    return np.stack((tokenized_graph, in_, x_situation, y_situation, sorted_frequency_graph, edge_situation, neighbor_situation), axis = 0) # remove frequency_graph, 
 
 def featurize_prior_knowledge_train(in_p_k, tokenized_target_arr):
     # print(tokenized_target_arr)
@@ -397,3 +397,67 @@ def enforce_global_objective(test_objective, global_objective):
 
             return global_objective   
     
+def get_final_scenarios(global_objective):
+    scenarios = []
+    for n in global_objective:
+        if len(n[0]) > 2 and n[0][1] != 'nil' and n[0][len(n[0])-1] == 'direct':
+            if len(n) == 1:
+                scenarios.append([n[0][0], n[0][2], n[0][1]])
+            elif len(n) > 1:
+                for candidate in n[1]:
+                    candidate_soln = [x for x in n if type(x) == tuple and x[0] == candidate][0]
+                    new_list = [n[0][0], candidate_soln[0], list(candidate_soln[1]), 'x'] + list(n[0][1:len(n[0])-1])
+                    if new_list not in scenarios:
+                        scenarios.append(new_list)
+           
+        elif len(n[0]) == 2:
+            for candidate in n[2]:
+                candidate_soln = [x for x in n if type(x) == tuple and x[0] == candidate][0]
+                new_list_1 = [n[0][0], candidate_soln[0], list(candidate_soln[1]), n[0][1]]
+                new_list_2 = [n[1][0], candidate_soln[0], list(candidate_soln[2]), n[1][1]]
+                if new_list_1 not in scenarios:
+                    scenarios.append(new_list_1)
+                if new_list_2 not in scenarios:    
+                    scenarios.append(new_list_2)
+    #print('scenarios before removing redundant: ', scenarios)  
+    
+    # remove redundant
+    scenarios = [y for y in scenarios if ('x' in y or 'direct' in y) or y[0] != y[len(y)-1]]
+    #print('scenarios after removing redundant: ', scenarios)  
+    # remove non-deterministic
+    deterministic_scenarios = []
+    
+    for l in range(len(scenarios)):
+        cur_scenario = scenarios[l]
+        cur_scenario_in_scenarios = [x for x in scenarios if x[0] == cur_scenario[0] and x[len(x)-1] == cur_scenario[len(cur_scenario)-1]]
+        cur_scenario_in_deterministic = [x for x in deterministic_scenarios if x[0] == cur_scenario[0] and x[len(x)-1] == cur_scenario[len(cur_scenario)-1]]
+        
+        if len(cur_scenario_in_scenarios) == 1 or (len(cur_scenario_in_scenarios) > 1 and len(cur_scenario_in_deterministic) == 0):
+            deterministic_scenarios.append(cur_scenario)
+        if (len(cur_scenario_in_scenarios) > 1 and len(cur_scenario_in_deterministic) == 1):
+            if len(cur_scenario[2]) < len(cur_scenario_in_deterministic[0][2]):
+                deterministic_scenarios.remove(cur_scenario_in_deterministic[0])
+                cur_scenario = [y for y in cur_scenario if y != 'x']
+                deterministic_scenarios.append(cur_scenario)
+            elif len(cur_scenario[2]) == 1 and len(cur_scenario_in_deterministic[0][2]) == 1:
+                deterministic_scenarios.remove(cur_scenario_in_deterministic[0])
+                new_scenario = cur_scenario_in_deterministic[0] 
+                to_add = cur_scenario[1:len(new_scenario)]
+                new_scenario = new_scenario[0:len(new_scenario) - 1] + cur_scenario[1:len(new_scenario)]
+                new_scenario = [y for y in new_scenario if y != 'x']
+                deterministic_scenarios.append(new_scenario)
+                
+    #print('deterministic_scenarios before control: ', deterministic_scenarios)  
+    if len(deterministic_scenarios) == 2 and deterministic_scenarios[0][0] == deterministic_scenarios[1][0] and 'x' not in deterministic_scenarios[0] and 'x' not in deterministic_scenarios[1]:
+        m = len(deterministic_scenarios[0][2]) == 1
+        n = len(deterministic_scenarios[1][2]) == 1
+        if (m and not n) or (not m and n):
+            if m:
+                deterministic_scenarios[1][2] = ['not'] + deterministic_scenarios[0][2]
+            elif n:
+                deterministic_scenarios[0][2] = ['not'] + deterministic_scenarios[1][2]
+                
+    return deterministic_scenarios
+
+
+
