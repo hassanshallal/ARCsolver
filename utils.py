@@ -149,7 +149,7 @@ def plot_task_eval(task, testpreds):
     norm = colors.Normalize(vmin=0, vmax=9)
     train_len = len(task['train'])
     test_len = len(task['test'])
-
+    #print('train_len: ', train_len, ' test_len: ', test_len)
     fig_dim = 0
     if type(testpreds) == list:
         fig_dim = train_len*2 + test_len*3

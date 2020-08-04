@@ -8,6 +8,7 @@ class Fragmented:
         self.bg = bg
         self.testoutputs = testoutputs
 
+
         # data members to understand dimensions situation
         self.freq_nonbg_traininputs = self.get_freq_nonbg_inputs(self.cur_train_preds) # just the number of nonbg: utilized only in dimensionWork
         self.freq_nonbg_testinputs = self.get_freq_nonbg_inputs(self.cur_test_preds) # just the number of nonbg: utilized only in dimensionWork
