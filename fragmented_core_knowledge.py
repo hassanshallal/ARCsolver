@@ -26,14 +26,11 @@ class Fragmented:
         self.trainoutput_objects = [extract_objects(x) for x in self.trainoutputs]
         self.testinput_objects = [extract_objects(x) for x in self.cur_test_preds]
 
-        self.unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
-
         # logical Factors
+        self.unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
         self.is_unique_train_outputs = all([len(x) == 1 for x in self.unique_train_outputs])
-        if self.is_unique_train_outputs:
-            self.bg_in_unique_train_outputs = self.bg in self.unique_train_outputs
-        else:
-            self.bg_in_unique_train_outputs = None
+        self.bg_in_unique_train_outputs = self.bg in self.unique_train_outputs
+
 
         self.is_sim_in_shapes = all([x.shape == self.cur_train_preds[0].shape for x in self.cur_train_preds])
         self.is_sim_out_shapes = all([x.shape == self.trainoutputs[0].shape for x in self.trainoutputs])

@@ -57,6 +57,7 @@ class Inductive(TaskManager):
 
     def sets_obj_on_train(self, cur_x_train, cur_y_train, this_objective):
         objective = deepcopy(this_objective)
+        #print('here in setting objective')
         #print('objective: ', objective)
         sets_dict = {}
         this_target = 'nil'
@@ -65,14 +66,16 @@ class Inductive(TaskManager):
                 if len(obj) == 2:
                     sets_dict[obj[0]] = [set() for index in range(1, cur_x_train.shape[0])]
                     sets_dict[obj[1]] = [set() for index in range(1, cur_x_train.shape[0])]
+
         if self.fragmented_core_knowledge.is_unique_train_outputs:
+            #print('here in is_unique_train_outputs')
             for obj in objective:
                 if len(obj) == 1 and len(obj[0]) == 3 and obj[0][1] != 'nil' and obj[0][2] == 'direct':
                     this_target = obj[0][1]
                     sets_dict[this_target] = [set() for index in range(1, cur_x_train.shape[0])]
                     sets_dict['other'] = [set() for index in range(1, cur_x_train.shape[0])]
 
-        #print('sets_dict before:', sets_dict)
+        # print('sets_dict before:', sets_dict)
         if len(sets_dict) > 0:
             for x in range(cur_x_train.shape[1]):
                 for y in range(cur_x_train.shape[2]):
@@ -88,12 +91,11 @@ class Inductive(TaskManager):
                             else:
                                 sets_dict['other'][z-1].add(cur_x_train[z][x][y])
 
-            #print('sets_dict after: ', sets_dict)
+            # print('sets_dict after: ', sets_dict)
             # for cases where output has similar dimension to input
             for obj in objective:
                 if len(obj) == 2:
                     is_opprtunity = [len(x.intersection(y)) == 0 for x, y in zip(sets_dict[obj[0]], sets_dict[obj[1]])]
-
                     if any(is_opprtunity):
                         columns = [i+1 for i in range(len(is_opprtunity)) if is_opprtunity[i]]
                         if len(columns) > 0:
@@ -108,20 +110,29 @@ class Inductive(TaskManager):
                         this_target = obj[0][1]
                         sets_dict['any_opp'] = [sets_dict[this_target][x] - sets_dict['other'][x] for x in range(len(sets_dict[this_target]))]
                         sets_dict['is_opp'] = [len(x) > 0 for x in sets_dict['any_opp']]
+                        #print('sets_dict after opportunity assesment:', sets_dict)
                         if any(sets_dict['is_opp']):
                             columns = [i+1 for i in range(len(sets_dict['is_opp'])) if sets_dict['is_opp'][i]]
                             obj.append(columns)
                             for opp in obj[1]:
                                 obj.append((opp, sets_dict['any_opp'][opp-1]))
 
+        #print('objective before spitting:', objective)
         return objective
 
     def globalize_objective(self):
         # validate and compile on a train level
         len_list = [len(x) for x in self.running_objective]
-        lead_index = len_list.index(max(len_list))
+        if any([x != len_list[0] for x in len_list]): # we have a longer lead
+            lead_index = len_list.index(max(len_list))
+        else:
+            entire_lengths = []
+            for obj in self.running_objective:
+                entire_lengths.append(max([len(x) for x in obj]))
+            lead_index = entire_lengths.index(max(entire_lengths))
 
-        lead_objective = self.running_objective[lead_index]
+
+        lead_objective = deepcopy(self.running_objective[lead_index])
 
         #print('lead_objective before merging: ', lead_objective)
         for n in range(len(self.running_objective)):
@@ -162,7 +173,8 @@ class Inductive(TaskManager):
                 routines = [pass_info['routine']] * len(self.traininputs)
                 train_situation = [x[0](y, x[1]) for x, y in zip(routines, train_situation)]
         elif what_to_try == 'apply_scenarios':
-            train_situation = [apply_routine(self.pr_kn_apply_scenarios, x, y, z) for x, y, z in zip(self.cur_x_train, self.token_to_colors, self.train_output_dim_preds)]
+            pass_info = {'is_unique_train_outputs': self.fragmented_core_knowledge.is_unique_train_outputs, 'bg_in_unique_train_outputs': self.fragmented_core_knowledge.bg_in_unique_train_outputs, 'bg': self.bg}
+            train_situation = [apply_routine(self.pr_kn_apply_scenarios, x, y, z, pass_info) for x, y, z in zip(self.cur_x_train, self.token_to_colors, self.train_output_dim_preds)]
     # apply_scenarios(pr_knowledge_input, pr_kn_apply_scenarios, token_to_color)
         train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
         if all(train_screen):
@@ -177,7 +189,8 @@ class Inductive(TaskManager):
                     routines = [pass_info['routine']] * len(self.testinputs)
                     test_situation = [x[0](y, x[1]) for x, y in zip(routines, test_situation)]
             elif what_to_try == 'apply_scenarios':
-                test_situation = [apply_routine(self.pr_kn_apply_scenarios, x, y, z) for x, y, z in zip(self.cur_x_test, self.test_token_to_colors, self.test_output_dim_preds)]
+                pass_info = {'is_unique_train_outputs': self.fragmented_core_knowledge.is_unique_train_outputs, 'bg_in_unique_train_outputs': self.fragmented_core_knowledge.bg_in_unique_train_outputs, 'bg': self.bg}
+                test_situation = [apply_routine(self.pr_kn_apply_scenarios, x, y, z, pass_info) for x, y, z in zip(self.cur_x_test, self.test_token_to_colors, self.test_output_dim_preds)]
 
             if len(self.testoutputs) > 0:
                 test_screen = [np.array_equal(x, y) for x, y in zip(test_situation, self.testoutputs)]
@@ -218,7 +231,7 @@ class Inductive(TaskManager):
                     indices = [i for i, tupl in enumerate(self.apply_routine_list) if tupl[0] == what_to_apply]
                     indices = indices.pop()
                     current_situation, train_situation, train_screen, test_situation, test_screen = self.try_apply_routines(what_to_apply, self.apply_routine_list[indices][1], pass_info)
-                    if current_situation in ['passed_all_traininputs', 'passed_some_traininputs', 'passed_all_testinputs', 'passed_some_testinputs']:
+                    if current_situation in ['passed_all_traininputs', 'passed_some_traininputs', 'passed_all_testinputs', 'passed_some_testinputs', 'unpassed_all_testinputs']:
                         self.apply_routine_list[indices] = (self.apply_routine_list[indices][0], self.apply_routine_list[indices][1], current_situation)
                     if current_situation == 'passed_all_testinputs':
                         self.solved = 'solved'

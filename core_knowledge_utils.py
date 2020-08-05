@@ -2,6 +2,9 @@ from utils import *
 from edges import *
 from neighbors import *
 
+# screen_dimensions tasks: 222, 268, 288, 306
+# direct_transformatio: 266, 336, 388
+# single output: 99, 128, 338, 345
 # hard coding the process of testing intersections among keys-values
 def find_intersection_keys_values(this_map):
     keys_set = set(this_map.keys())
@@ -102,56 +105,62 @@ def apply_value_maps(in_, signal_map, pass_info):
                     in_[n,m] = signal_map[in_[n,m]].pop()
     return in_
 
-def apply_scenarios(pr_kn_apply_scenarios, pr_knowledge_input, token_to_color, output_dim_preds):
+def apply_scenarios(pr_kn_apply_scenarios, pr_knowledge_input, token_to_color, output_dim_preds, pass_info):
     # special case of unique output, make sure frequency is number 4 in pr knowledge: 128, 99, 338
-    collected_freqs = []
-    is_uniqe_otuput = True
-    for scen in pr_kn_apply_scenarios:
-        only_scen = [x for x in scen if type(x) != str]
-        if len(only_scen) == 2 and only_scen[0] == 4:
-            collected_freqs.append(only_scen[1])
-        else:
-            is_uniqe_otuput = False
+    if pass_info['is_unique_train_outputs']:
+        collected_scens = []
+        for scen in pr_kn_apply_scenarios:
+            only_scen = [x for x in scen if type(x) != str]
+            if len(only_scen) == 2:
+                collected_scens.append(only_scen)
+        #print('collected_scens: ', collected_scens)
 
-    if is_uniqe_otuput and all([x == collected_freqs[0] for x in collected_freqs]) and len(collected_freqs[0]) == 1:
-        # get the props
-        target_freq = collected_freqs[0][0]
-        coord = np.argwhere(pr_knowledge_input[4] == target_freq)[0].tolist()
-        props = pr_knowledge_input[0][coord[0]][coord[1]]
-        output = build_a_prediction(output_dim_preds, add_to_zero = token_to_color[props])
-        return output
+        if len(collected_scens) > 0 and  all([x == collected_scens[0] for x in collected_scens]) and len(collected_scens[0]) == 2:
+            # get the props
+            target_value = collected_scens[0][1][0]
+            coord = np.argwhere(pr_knowledge_input[collected_scens[0][0]] == target_value)[0].tolist()
+            props = pr_knowledge_input[0][coord[0]][coord[1]]
+            # 338 check bg
+            if pass_info['bg'] == token_to_color[props] and pass_info['bg_in_unique_train_outputs'] == False:
+                #print("Force an heuristic pick, bg can't be the solution.")
+                options = list(token_to_color.keys())
+                options.remove('bg')
+                props = random.choice(options)
 
-    # get the tokenized starter
-    y = deepcopy(pr_knowledge_input[0])
-    # organize scenarios based on leads
-    leads = [x[0] for x in pr_kn_apply_scenarios]
-    leads_scenarios = {}
-    for k in leads:
-        leads_scenarios[k] = [x for x in pr_kn_apply_scenarios if x[0] == k]
+            output = build_a_prediction(output_dim_preds, add_to_zero = token_to_color[props])
+            return output
+    else:
+        # get the tokenized starter
+        y = deepcopy(pr_knowledge_input[0])
+        # organize scenarios based on leads
+        leads = [x[0] for x in pr_kn_apply_scenarios]
+        leads_scenarios = {}
+        for k in leads:
+            leads_scenarios[k] = [x for x in pr_kn_apply_scenarios if x[0] == k]
 
-    for m in range(y.shape[0]):
-        for n in range(y.shape[1]):
-            if y[m][n] in leads_scenarios.keys():
-                playgrounds = leads_scenarios[y[m][n]]
-                for playground in playgrounds:
-                    if playground[1] == 'direct':
-                        y[m][n] = playground[2]
-                    elif len(playground) == 4:
-                        if 'not' not in playground[2] and pr_knowledge_input[playground[1]][m][n] in playground[2]:
-                            y[m][n] = playground[3]
-                        elif 'not' in playground[2] and pr_knowledge_input[playground[1]][m][n] not in playground[2]:
-                            y[m][n] = playground[3]
+        for m in range(y.shape[0]):
+            for n in range(y.shape[1]):
+                if y[m][n] in leads_scenarios.keys():
+                    playgrounds = leads_scenarios[y[m][n]]
+                    for playground in playgrounds:
+                        if playground[1] == 'direct':
+                            y[m][n] = playground[2]
+                        elif len(playground) == 4:
+                            if 'not' not in playground[2] and pr_knowledge_input[playground[1]][m][n] in playground[2]:
+                                y[m][n] = playground[3]
+                            elif 'not' in playground[2] and pr_knowledge_input[playground[1]][m][n] not in playground[2]:
+                                y[m][n] = playground[3]
 
-                    elif len(playground) > 4:
-                        current_options = [x for x in playground if type(x) != str]
-                        kn_indices = [i for i in range(len(current_options)) if i % 2 == 0]
-                        vals_indices = [i for i in range(len(current_options)) if i % 2 != 0]
-                        test_all = np.all([pr_knowledge_input[current_options[x]][m][n] in current_options[y] for x, y in zip(kn_indices, vals_indices)])
-                        if test_all:
-                            y[m][n] = playground[len(playground) - 1]
+                        elif len(playground) > 4:
+                            current_options = [x for x in playground if type(x) != str]
+                            kn_indices = [i for i in range(len(current_options)) if i % 2 == 0]
+                            vals_indices = [i for i in range(len(current_options)) if i % 2 != 0]
+                            test_all = np.any([pr_knowledge_input[current_options[x]][m][n] in current_options[y] for x, y in zip(kn_indices, vals_indices)])
+                            if test_all:
+                                y[m][n] = playground[len(playground) - 1]
 
-    z = apply_transform_map(y, token_to_color)
-    return z
+        z = apply_transform_map(y, token_to_color)
+        return z
 
 def get_x_y_situation(in_):
     dim_0 = in_.shape[0]
@@ -179,9 +188,12 @@ def get_frequency_graph(frequency_counter, include_bg, bg):
     return frequency_graph
 
 # this is used in prior knowledge: fails when two players have the same frequency as in case 99 testinput
+# we have several way to solve this, in case of ties, sort in the direction of between
+# least frquent and most frequent, this is not easy to formalize, not what we want but let's just get this done
 def get_frequency_situation(in_):
     frequency_counter = Counter(list(itertools.chain.from_iterable(in_.tolist()))).most_common()
     frequency_counter = sorted(frequency_counter, key=lambda tup: (tup[1], tup[0]))
+
 
     frequency_list = []
     for x in frequency_counter:
@@ -198,6 +210,22 @@ def get_frequency_situation(in_):
         elif n != 0 and frequency_counter[n][1] == frequency_counter[n-1][1]:
             pass
         new_fc.append((frequency_counter[n][0], cur_rank))
+
+    # break ties (hard coding issue with 99 test):
+    if (len(new_fc) - 1) - new_fc[len(new_fc) - 1][1] == 1:
+        new_fc = [(x[0], x[1] + 1) for x in new_fc]
+        freqs = [x[1] for x in new_fc]
+        lead = new_fc[len(new_fc) - 1][0]
+        for m in range(len(freqs) - 1):
+            if freqs[m] == freqs[m+1]:
+                first = new_fc[m][0]
+                second = new_fc[m + 1][0]
+                if (first > second and lead > second) or (first < second and lead < second):
+                    #print('Force a tie breaking in frequencies in a heuristic fashion.')
+                    temp = new_fc[m]
+                    new_fc[m] = new_fc[m + 1]
+                    new_fc[m + 1] = temp
+                    new_fc[m] = (new_fc[m][0], new_fc[m][1] - 1)
 
     sorting_dict = {}
     for x in new_fc:
@@ -217,13 +245,26 @@ def get_flips_rotation(in_):
     return diagonal_mirror, offdiagonal_mirror, rotated90_1, rotated90_2, rotated90_3, flipped_ud, flipped_lr
 
 def build_prior_knowledge(in_, bg, color_to_token):
-    x_situation, y_situation = get_x_y_situation(in_)
-    sorted_frequency_graph = get_frequency_situation(in_)
     tokenized_graph = apply_transform_map(in_, color_to_token)
-    edge_situation = get_edge_situation(in_, bg)
-    neighbor_situation = neighbor_situation_whole(in_)
 
-    return np.stack((tokenized_graph, in_, x_situation, y_situation, sorted_frequency_graph, edge_situation, neighbor_situation), axis = 0) # remove frequency_graph,
+    x_situation, y_situation = get_x_y_situation(in_)
+
+    sorted_frequency_graph = get_frequency_situation(in_)
+    edge_situation = get_edge_situation(in_, bg)
+
+    nb_space_situation, neighbor_situation, most_common_neighbor, least_common_neighbor = neighbor_situation_whole(in_)
+
+    comb0 = edge_situation + sorted_frequency_graph
+    comb1 = neighbor_situation + sorted_frequency_graph
+    comb2 = nb_space_situation + sorted_frequency_graph
+
+    comb3 = edge_situation + neighbor_situation
+    comb4 = edge_situation + nb_space_situation
+
+    comb5 = neighbor_situation + nb_space_situation
+
+
+    return np.stack((tokenized_graph, in_, x_situation, y_situation, sorted_frequency_graph, edge_situation, neighbor_situation, nb_space_situation, most_common_neighbor, least_common_neighbor, comb0, comb1, comb2, comb3, comb4, comb5), axis = 0) # remove frequency_graph,
 
 def featurize_prior_knowledge_train(in_p_k, tokenized_target_arr):
     # print(tokenized_target_arr)
@@ -253,8 +294,8 @@ def featurize_prior_knowledge_test(in_p_k):
     return np.array(x, dtype = object)
 
 def merge_sub_objectives(sub_test, sub_lead):
-#     print('sub_test:', sub_test)
-#     print('sub_lead:', sub_lead)
+    # print('sub_test before anything:', sub_test)
+    # print('sub_lead before anything:', sub_lead)
     if len(sub_test[0]) == 2 and len(sub_test) > 2 and len(sub_lead) > 2 and sub_test[0:2] == sub_lead[0:2]:
         intersect = sorted(list(set(sub_test[2]).intersection(set(sub_lead[2]))))
         #print('intersect:', intersect)
@@ -299,12 +340,28 @@ def merge_sub_objectives(sub_test, sub_lead):
 
         intersect = sorted(list(set(sub_test[1]).intersection(set(sub_lead[1]))))
         if len(intersect) > 0:
-            merger = [modified_lead_tuple, intersect]
+            merger = [modified_lead_tuple, deepcopy(intersect)]
             for n in intersect:
                 in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
                 in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
-                new_sit = (n, in_sub_test[0][1].union(in_sub_lead[0][1]))
-                merger.append(new_sit)
+                if len(in_sub_test) == 1 and len(in_sub_lead) == 1:
+                    new_sit = (n, in_sub_test[0][1].union(in_sub_lead[0][1]))
+                    merger.append(new_sit)
+
+            to_evaluate = merger[2:len(merger)]
+            test = [x for x in to_evaluate if len(x[1]) == 1]
+            if any(test) == False:
+                merger = [modified_lead_tuple, deepcopy(intersect)]
+                for n in intersect:
+                    in_sub_test = [x for x in sub_test if x[0] == n and type(x) == tuple]
+                    in_sub_lead = [x for x in sub_lead if x[0] == n and type(x) == tuple]
+                    if len(in_sub_test) == 1 and len(in_sub_lead) == 1:
+                        new_sit = (n, in_sub_test[0][1].intersection(in_sub_lead[0][1]))
+                        if len(new_sit[1]) > 0:
+                            merger.append(new_sit)
+                        elif len(new_sit[1]) == 0:
+                            merger[1].remove(n)
+
             return merger
         else:
             merger = [modified_lead_tuple]

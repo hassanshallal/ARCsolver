@@ -15,6 +15,9 @@ import random
 from collections import Counter
 from scipy.ndimage import find_objects
 
+# First stochastic
+import random
+
 from deductive import *
 
 # This utils.py is not supposed to be related to any logic

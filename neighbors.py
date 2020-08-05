@@ -81,11 +81,23 @@ def neighbor_situation_whole(maze):
     dim_0 = maze.shape[0]
     dim_1 = maze.shape[1]
 
+    space_of_neighbors = np.empty((dim_0, dim_1), dtype = np.int64)
     num_of_diff_neighbors = np.empty((dim_0, dim_1), dtype = np.int64)
+    most_common_neighbor = np.empty((dim_0, dim_1), dtype = np.int64)
+    least_common_neighbor = np.empty((dim_0, dim_1), dtype = np.int64)
+
 
     for n in range(0, dim_0):
         for m in range(0, dim_1):
             results[(n, m), maze[n][m]] = neighbor_situation(maze, n, m)
+            #print(results[(n, m), maze[n][m]])
+            target_vals = list(results[(n, m), maze[n][m]][1].values())
+            target_multiplier = len(results[(n, m), maze[n][m]][1])
+            space_of_neighbors[n, m] = sum([x*target_multiplier for x in target_vals])
             num_of_diff_neighbors[n, m] = results[(n, m), maze[n][m]][4]
+            max_value = max(results[(n, m), maze[n][m]][3], key=results[(n, m), maze[n][m]][3].get)
+            most_common_neighbor[n,m ] = results[(n, m), maze[n][m]][1][max_value]
+            min_value = min(results[(n, m), maze[n][m]][3], key=results[(n, m), maze[n][m]][3].get)
+            least_common_neighbor[n,m ] = results[(n, m), maze[n][m]][1][min_value]
 
-    return num_of_diff_neighbors
+    return space_of_neighbors, num_of_diff_neighbors, most_common_neighbor, least_common_neighbor
