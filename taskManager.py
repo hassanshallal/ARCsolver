@@ -37,6 +37,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         # gather general information about the dimensionality from training
         self.is_similar_dim, self.input_dims, self.output_dims = explore_dimensions(self.traininputs, self.trainoutputs)
+
         self.traininputs_vals = [np.unique(n).tolist() for n in self.traininputs]
         self.trainoutputs_vals = [np.unique(n).tolist() for n in self.trainoutputs]
         self.testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]

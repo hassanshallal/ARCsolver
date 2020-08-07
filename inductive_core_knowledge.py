@@ -3,6 +3,7 @@ from taskManager import *
 from core_knowledge_utils import *
 
 from fragmented_core_knowledge import *
+from ARCsolver import *
 
 from edges import *
 from neighbors import *
@@ -13,7 +14,10 @@ class Inductive(TaskManager):
 
         # It is obvious we work on dimensions first
         self.fragmented_core_knowledge = Fragmented(self.cur_train_preds, self.trainoutputs, self.cur_test_preds, self.bg, self.testoutputs)
-        self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.fragmented_core_knowledge.get_dimension_cognified()
+        self.ARCsolver = ARCsolver(raw_task)
+        self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.ARCsolver.get_dimension_cognified()
+        if self.dimension_status != 'deduced':
+            self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.fragmented_core_knowledge.get_dimension_cognified()
 
         self.fragmented_core_knowledge.carry_along_kwargs(dimension_status = self.dimension_status)
         self.fragmented_core_knowledge.carry_along_kwargs(train_output_dim_preds = self.train_output_dim_preds)

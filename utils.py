@@ -7,9 +7,11 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib import colors
+import numpy as np
+
 import itertools
 from itertools import permutations, combinations, product
-import numpy as np
+
 from functools import reduce
 import random
 from collections import Counter
@@ -299,9 +301,11 @@ nbh = lambda x, i, j: { #x is array, i and j are row and column indices
 
 # get a background
 def get_background(arr):
-    bincount = np.bincount(arr.flatten())
-    major = bincount.argmax()
-    return major
+    vals, counts = np.unique(arr, return_counts = True)
+    vals = vals.tolist()
+    counts = counts.tolist()
+    max_index = counts.index(max(counts))
+    return vals[max_index]
 
 # Tests based on prior knowledge
 # process_diff gives insights about the bg and the nonbg
