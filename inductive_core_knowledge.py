@@ -61,8 +61,6 @@ class Inductive(TaskManager):
 
     def sets_obj_on_train(self, cur_x_train, cur_y_train, this_objective):
         objective = deepcopy(this_objective)
-        #print('here in setting objective')
-        #print('objective: ', objective)
         sets_dict = {}
         this_target = 'nil'
         if cur_y_train.shape[0] == cur_x_train.shape[1] and cur_y_train.shape[1] == cur_x_train.shape[2]:
@@ -79,7 +77,6 @@ class Inductive(TaskManager):
                     sets_dict[this_target] = [set() for index in range(1, cur_x_train.shape[0])]
                     sets_dict['other'] = [set() for index in range(1, cur_x_train.shape[0])]
 
-        # print('sets_dict before:', sets_dict)
         if len(sets_dict) > 0:
             for x in range(cur_x_train.shape[1]):
                 for y in range(cur_x_train.shape[2]):
@@ -95,7 +92,6 @@ class Inductive(TaskManager):
                             else:
                                 sets_dict['other'][z-1].add(cur_x_train[z][x][y])
 
-            # print('sets_dict after: ', sets_dict)
             # for cases where output has similar dimension to input
             for obj in objective:
                 if len(obj) == 2:
@@ -121,7 +117,6 @@ class Inductive(TaskManager):
                             for opp in obj[1]:
                                 obj.append((opp, sets_dict['any_opp'][opp-1]))
 
-        #print('objective before spitting:', objective)
         return objective
 
     def globalize_objective(self):

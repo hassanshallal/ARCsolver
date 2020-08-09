@@ -2,7 +2,7 @@ from untokenized import *
 
 class ARCsolver:
 
-    def __init__(self, raw_task, forced_bg = None):
+    def __init__(self, raw_task):
         self.raw_task = raw_task
         self.num_train = len(raw_task['train'])
         self.num_test = len(raw_task['test'])
@@ -10,32 +10,30 @@ class ARCsolver:
         self.testinputs, self.testoutputs = get_testing(raw_task) # For tasks where there is no output, testoutputs is an empty list
 
         # prepare relevant info for your tests conditionally on presence of testoutputs
-        self.traininputs_bg = [get_background(n) for n in self.traininputs]
-        self.testinputs_bg = [get_background(n) for n in self.testinputs]
+        self.freqs_traininputs = [get_sorted_frequency_situation(x) for x in self.traininputs]
+        self.freqs_trainoutputs = [get_sorted_frequency_situation(x) for x in self.trainoutputs]
+        self.freqs_testinputs = [get_sorted_frequency_situation(x) for x in self.testinputs]
 
         # assess bg and apply deductive routines to the task
+        self.traininputs_bg = [x[0][0] for x in self.freqs_traininputs]
+        self.testinputs_bg = [x[0][0]  for x in self.freqs_testinputs]
         self.global_bg, self.bg = self.assess_bg_situation()
-        if forced_bg != None:
-            self.global_bg = True
-            self.bg = forced_bg
-
 
         # dimensions initial processing
         self.traininputs_shapes = [list(x.shape) for x in self.traininputs]
         self.trainoutputs_shapes = [list(x.shape) for x in self.trainoutputs]
         self.testinputs_shapes = [list(x.shape) for x in self.testinputs]
 
-        if len(self.testoutputs) > 0:
-            self.testoutputs_shapes = [list(x.shape) for x in self.testoutputs]
-        else:
-            self.testoutputs_shapes = []
+        # overaall num of cells
+        self.num_cells_traininputs = [x[0] * x[1] for x in self.traininputs_shapes]
+        self.num_cells_trainoutputs = [x[0] * x[1] for x in self.trainoutputs_shapes]
 
         # dimesnion relationship extraction
         self.is_same_dim_couple = all([x == y for x, y in zip(self.traininputs_shapes, self.trainoutputs_shapes)])
-
         self.is_sim_out_shapes = all([x.shape == self.trainoutputs[0].shape for x in self.trainoutputs])
         self.int_div = [get_int_div(x, y) for x, y in zip(self.traininputs_shapes, self.trainoutputs_shapes)]
         self.is_sim_int_div = all([x == self.int_div[0] for x in self.int_div])
+        self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.int_div])
 
         self.traininput_objects = sort_objects_dims_by_size([extract_objects(x) for x in self.traininputs])
         self.testinput_objects = sort_objects_dims_by_size([extract_objects(x) for x in self.testinputs])
@@ -57,7 +55,26 @@ class ARCsolver:
         self.out_in_rel = [convolve_for_a_match(x, y, z) for x, y, z in zip(self.traininputs, self.trainoutputs, self.what_relation)]
         self.is_out_in_rel = all([x[0] for x in self.out_in_rel])
 
+        # logical Factors
+        self.unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
+        self.is_unique_train_outputs = all([len(x) == 1 for x in self.unique_train_outputs])
+        self.bg_in_unique_train_outputs = self.bg in self.unique_train_outputs
 
+        self.row_dim_ouputs = [x[0] for x in self.trainoutputs_shapes]
+        self.col_dim_ouputs = [x[1] for x in self.trainoutputs_shapes]
+        self.is_one_row = any([x == 1 for x in self.row_dim_ouputs])
+        self.is_one_col = any([x == 1 for x in self.col_dim_ouputs])
+        self.is_one_row_or_column = self.is_one_row or self.is_one_col
+        #all([(x[0] == 1 or x[1] == 1) and ((x[0] == 1) != (x[1] == 1)) for x in self.trainoutputs_shapes])
+
+        # we have the main traget is the testoutput, dimesnion and frequency of test components are subtargets
+        if len(self.testoutputs) > 0:
+            self.freqs_testoutputs = [get_sorted_frequency_situation(x) for x in self.testoutputs]
+            self.testoutputs_shapes = [list(x.shape) for x in self.testoutputs]
+        else:
+            self.freqs_testoutputs, self.testoutputs_shapes = [], []
+
+        # we start predicting dimensions
         self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.cognify_dimensions()
 
     def assess_bg_situation(self):
@@ -104,6 +121,8 @@ class ARCsolver:
                 test_dim_preds = [x[len(x) - from_max_index[0]] for x in self.testinput_objects_dims]
                 if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
                     return 'deduced',  train_dim_preds, test_dim_preds # 1
+            # else: 200:, 208  objects determined by two horizonal lines OR 4 corners!
+            #
 
         # comp_shape, minimum_objects_inputs, maximum_objects_inputs: 8 cases
         comp_shape = screen_basic_math(self.traininputs_shapes, self.trainoutputs_shapes)

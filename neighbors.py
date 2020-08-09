@@ -91,13 +91,15 @@ def neighbor_situation_whole(maze):
         for m in range(0, dim_1):
             results[(n, m), maze[n][m]] = neighbor_situation(maze, n, m)
             #print(results[(n, m), maze[n][m]])
+            num_of_diff_neighbors[n, m] = results[(n, m), maze[n][m]][4]
+
             target_vals = list(results[(n, m), maze[n][m]][1].values())
             target_multiplier = len(results[(n, m), maze[n][m]][1])
             space_of_neighbors[n, m] = sum([x*target_multiplier for x in target_vals])
-            num_of_diff_neighbors[n, m] = results[(n, m), maze[n][m]][4]
+
             max_value = max(results[(n, m), maze[n][m]][3], key=results[(n, m), maze[n][m]][3].get)
             most_common_neighbor[n,m ] = results[(n, m), maze[n][m]][1][max_value]
             min_value = min(results[(n, m), maze[n][m]][3], key=results[(n, m), maze[n][m]][3].get)
             least_common_neighbor[n,m ] = results[(n, m), maze[n][m]][1][min_value]
 
-    return space_of_neighbors, num_of_diff_neighbors, most_common_neighbor, least_common_neighbor
+    return num_of_diff_neighbors, space_of_neighbors, most_common_neighbor, least_common_neighbor

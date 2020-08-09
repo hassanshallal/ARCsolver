@@ -1,4 +1,5 @@
 from utils import *
+from untokenized import *
 from edges import *
 from neighbors import *
 
@@ -107,6 +108,7 @@ def apply_value_maps(in_, signal_map, pass_info):
 
 def apply_scenarios(pr_kn_apply_scenarios, pr_knowledge_input, token_to_color, output_dim_preds, pass_info):
     # special case of unique output, make sure frequency is number 4 in pr knowledge: 128, 99, 338
+
     if pass_info['is_unique_train_outputs']:
         collected_scens = []
         for scen in pr_kn_apply_scenarios:
@@ -155,8 +157,18 @@ def apply_scenarios(pr_kn_apply_scenarios, pr_knowledge_input, token_to_color, o
                             current_options = [x for x in playground if type(x) != str]
                             kn_indices = [i for i in range(len(current_options)) if i % 2 == 0]
                             vals_indices = [i for i in range(len(current_options)) if i % 2 != 0]
-                            test_all = np.any([pr_knowledge_input[current_options[x]][m][n] in current_options[y] for x, y in zip(kn_indices, vals_indices)])
-                            if test_all:
+
+                            # we test based on the options, this can be stochastic/heuristic
+                            screens = []
+                            for x, q in zip(kn_indices, vals_indices):
+                                screens.append(pr_knowledge_input[current_options[x]][m][n] in current_options[q])
+
+                            all_good = np.all(screens)
+                            any_good = np.any(screens)
+
+                            if not all([len(current_options[x]) == 1 for x in vals_indices]) and any_good:
+                                y[m][n] = playground[len(playground) - 1]
+                            elif all([len(current_options[x]) == 1 for x in vals_indices]) and all_good:
                                 y[m][n] = playground[len(playground) - 1]
 
         z = apply_transform_map(y, token_to_color)
@@ -250,21 +262,22 @@ def build_prior_knowledge(in_, bg, color_to_token):
     x_situation, y_situation = get_x_y_situation(in_)
 
     sorted_frequency_graph = get_frequency_situation(in_)
+
     edge_situation = get_edge_situation(in_, bg)
 
-    nb_space_situation, neighbor_situation, most_common_neighbor, least_common_neighbor = neighbor_situation_whole(in_)
+    num_neighbors, nb_space_situation, most_common_neighbor, least_common_neighbor = neighbor_situation_whole(in_)
 
     comb0 = edge_situation + sorted_frequency_graph
-    comb1 = neighbor_situation + sorted_frequency_graph
+    comb1 = num_neighbors + sorted_frequency_graph
     comb2 = nb_space_situation + sorted_frequency_graph
 
-    comb3 = edge_situation + neighbor_situation
+    comb3 = edge_situation + num_neighbors
     comb4 = edge_situation + nb_space_situation
 
-    comb5 = neighbor_situation + nb_space_situation
+    comb5 = num_neighbors * nb_space_situation
 
 
-    return np.stack((tokenized_graph, in_, x_situation, y_situation, sorted_frequency_graph, edge_situation, neighbor_situation, nb_space_situation, most_common_neighbor, least_common_neighbor, comb0, comb1, comb2, comb3, comb4, comb5), axis = 0) # remove frequency_graph,
+    return np.stack((tokenized_graph, in_, x_situation, y_situation, sorted_frequency_graph, edge_situation, num_neighbors, nb_space_situation, most_common_neighbor, least_common_neighbor, comb4), axis = 0) # , comb0, comb1, comb2, comb3, comb4, comb5
 
 def featurize_prior_knowledge_train(in_p_k, tokenized_target_arr):
     # print(tokenized_target_arr)
@@ -502,5 +515,18 @@ def get_final_scenarios(global_objective):
                 deterministic_scenarios[1][2] = ['not'] + deterministic_scenarios[0][2]
             elif n:
                 deterministic_scenarios[0][2] = ['not'] + deterministic_scenarios[1][2]
+
+    # Massage x and y coordinates
+
+    for n in range(len(deterministic_scenarios)):
+        action = deterministic_scenarios[n]
+        for cc in [2, 3]:
+            if cc in action:
+                ind = action.index(cc)
+                is_series, new_series = series_analyzer(action[ind + 1])
+                if is_series:
+                    action[ind + 1] = new_series
+                elif len(action) > 4:
+                    deterministic_scenarios[n] = [action[l] for l in range(len(action)) if l not in[ind, ind+1]]
 
     return deterministic_scenarios

@@ -8,7 +8,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import numpy as np
-from scipy.ndimage import find_objects
+from scipy.ndimage import label, find_objects
 
 ## Book-keeping, I/O section
 # This is to serialize the opjects
@@ -146,7 +146,7 @@ def get_background(arr):
     counts = counts.tolist()
     max_index = counts.index(max(counts))
     return vals[max_index]
-    
+
 ## first principles prior knowledge encoding
 def list_comparator(l1, l2):
     if len(l1) == len(l2):
@@ -181,8 +181,22 @@ def list_modulo(l1, l2):
 def get_int_div(l1, l2):
         return [y / x for x, y in zip(l1, l2)]
 
+def sort_two_lists_based_on_second(l1, l2):
+    zipped_lists = zip(l2, l1)
+    sorted_pairs = sorted(zipped_lists, reverse = True)
+    tuples = zip(*sorted_pairs)
+    list2, list1 = [list(tuple) for tuple in  tuples]
+    return (list1, list2)
+
+def get_sorted_frequency_situation(x):
+    freqs = np.unique(x, return_counts = True)
+    return sort_two_lists_based_on_second(freqs[0].tolist(), freqs[1].tolist())
+
 def extract_objects(x):
     _objects = find_objects(x)
+    # labels, numobjects = label(x) # we introduced this, it decreses the number from 363 to 375, but it may be letter.
+    # _objects = find_objects(labels)
+    # if len(_objects) > 4:
 
     extracted = []
     for obj in _objects:
@@ -266,7 +280,6 @@ def get_flips_rotation(in_):
 def convolve_for_a_match(in_, out_, rel):
     #  in_ = np.where(in_ != bg, 1, 0)
     #  out_ = np.where(out_ != bg, 1, 0)
-
     matches = []
     if rel in ['>', '>=', '=>']:
         situation = 'contraction'
@@ -288,6 +301,7 @@ def convolve_for_a_match(in_, out_, rel):
             match_test = [np.all(to_match == smaller[x]) for x in range(len(smaller))]
             if to_match.shape == smaller[0].shape and any(match_test):
                 matches.append((match_test.index(True), (n, m)))
+                # we can jump here, we just want to make sure we do the right jump
 
     if len(matches) > 0:
         return True, matches, situation
@@ -321,9 +335,14 @@ def screen_basic_math(l1, l2):
                 to_do_subtra = 'add'
                 modula.append([y // x for x, y in zip(l1[n], l2[n]) if x != 0 and y != 0])
                 subtr.append([y - x for x, y in zip(l1[n], l2[n])])
-        if len(subtr) > 0 and all([x == subtr[0] for x in  subtr]) and (subtr[0] != [0, 0]):
+        if len(subtr) == 1 and len(subtr[0]) > 2:
+            subtr = subtr[0]
+        if len(modula) == 1  and len(modula[0]) > 2:
+            modula = modula[0]
+
+        if len(subtr) > 0 and all([x == subtr[0] for x in  subtr]) and (subtr[0] not in [0, [0, 0]]):
             return True, to_do_subtra, subtr[0]
-        elif len(modula) > 0 and all([x == modula[0] for x in  modula]) and (modula[0] != [0, 0]) and (modula[0] != [1, 1]):
+        elif len(modula) > 0 and all([x == modula[0] for x in  modula]) and modula[0] not in [0, 1, [0, 0], [1, 1]]:
             return True, to_do_modula, modula[0]
         return False, '', []
 
@@ -338,3 +357,48 @@ def apply_basic_math(todo, factor, input_list):
             return (np.array(input_list) * np.array(factor_list)).tolist()
         elif todo == 'div':
             return (np.array(input_list) // np.array(factor_list)).tolist()
+
+def expand_series(todo, factor, input_list, toadd):
+    if type(factor) == list and all([factor[0] == x for x in factor]):
+        factor = factor[0]
+    if todo == 'add':
+        for n in range(toadd):
+            input_list.append(input_list[len(input_list)-1] + factor)
+    elif todo == 'subtract':
+        for n in range(toadd):
+            input_list.append(input_list[len(input_list)-1] - factor)
+    elif todo == 'mult':
+        for n in range(toadd):
+            input_list.append(input_list[len(input_list)-1] * factor)
+    elif todo == 'div':
+        for n in range(toadd):
+            input_list.append(input_list[len(input_list)-1] // factor)
+    return input_list
+
+def series_analyzer(series_list):
+    if len(series_list) < 3:
+        return False, series_list
+    else:
+        l1 = [series_list[0:len(series_list) - 1]]
+        l2 = [series_list[1:len(series_list)]]
+        is_series, to_do, factor = screen_basic_math(l1, l2)
+        if is_series:
+            if type(factor) == list:
+                new_series = expand_series(to_do, factor[0], series_list, 5)
+            elif type(factor) == int:
+                new_series = expand_series(to_do, factor, series_list, 5)
+            return True, new_series
+        else:
+            return False, series_list
+
+def get_coordinates_from_arr(x, in_):
+    if type(in_) == list:
+        coordinates = []
+        for n in range(len(in_)):
+            this_in_ = in_[n]
+            target_indices = np.argwhere(this_in_ == x)
+            coordinates.append(target_indices)
+        return coordinates
+    else:
+        target_indices = np.argwhere(in_ == x)
+        return target_indices
