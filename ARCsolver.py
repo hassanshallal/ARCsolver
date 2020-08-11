@@ -16,6 +16,7 @@ class ARCsolver:
 
         # assess bg and apply deductive routines to the task
         self.traininputs_bg = [x[0][0] for x in self.freqs_traininputs]
+        self.trainoutputs_bg = [x[0][0] for x in self.freqs_trainoutputs]
         self.testinputs_bg = [x[0][0]  for x in self.freqs_testinputs]
         self.global_bg, self.bg = self.assess_bg_situation()
 
@@ -35,14 +36,11 @@ class ARCsolver:
         self.is_sim_int_div = all([x == self.int_div[0] for x in self.int_div])
         self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.int_div])
 
-        self.traininput_objects = sort_objects_dims_by_size([extract_objects(x) for x in self.traininputs])
-        self.testinput_objects = sort_objects_dims_by_size([extract_objects(x) for x in self.testinputs])
-        self.trainoutput_objects = sort_objects_dims_by_size([extract_objects(x) for x in self.trainoutputs])
-
+        self.traininput_objects = sort_objects_dims_by_size([extract_objects(x, self.global_bg, self.bg) for x in self.traininputs])
+        self.testinput_objects = sort_objects_dims_by_size([extract_objects(x, self.global_bg, self.bg) for x in self.testinputs])
+        self.trainoutput_objects = sort_objects_dims_by_size([extract_objects(x, self.global_bg, self.bg) for x in self.trainoutputs])
         self.traininput_objects_dims = get_dims_objects(self.traininput_objects)
         self.testinput_objects_dims = get_dims_objects(self.testinput_objects)
-        self.traininput_objects_freqs = get_freqs_object(self.traininput_objects )
-        self.testinput_objects_freqs = get_freqs_object(self.testinput_objects)
 
         self.trainoutput_dims_in_traininputs_objects = all([x in y for x, y in zip(self.trainoutputs_shapes, self.traininput_objects_dims)])
 
@@ -79,7 +77,11 @@ class ARCsolver:
 
     def assess_bg_situation(self):
         traininputs_bg_set = set(self.traininputs_bg)
-        if len(traininputs_bg_set) == 1:
+        trainoutputs_bg_set = set(self.trainoutputs_bg)
+        if 0 in traininputs_bg_set and 0 in trainoutputs_bg_set:
+            global_bg = True
+            bg = 0
+        elif len(traininputs_bg_set) == 1:
             global_bg = True
             bg = traininputs_bg_set.pop()
             bg = int(bg) #it is coming as numpy.int64 not int
@@ -105,6 +107,7 @@ class ARCsolver:
             test_dim_preds = modify_dimensiosn(self.testinputs_shapes, self.int_div[0])
             if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
                 return 'deduced',  train_dim_preds, test_dim_preds # 7
+
         if self.trainoutput_dims_in_traininputs_objects:
             indices = [x.index(y) for x, y in zip(self.traininput_objects_dims, self.trainoutputs_shapes)]
             same_index = all(x == indices[0] for x in indices)
@@ -123,7 +126,6 @@ class ARCsolver:
                     return 'deduced',  train_dim_preds, test_dim_preds # 1
             # else: 200:, 208  objects determined by two horizonal lines OR 4 corners!
             #
-
         # comp_shape, minimum_objects_inputs, maximum_objects_inputs: 8 cases
         comp_shape = screen_basic_math(self.traininputs_shapes, self.trainoutputs_shapes)
         if comp_shape[0]:
@@ -132,23 +134,24 @@ class ARCsolver:
             if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
                 return 'deduced',  train_dim_preds, test_dim_preds
 
-        minimum_objects_inputs = [x[0] for x in self.traininput_objects_dims]
-        comp_minimum_objects = screen_basic_math(minimum_objects_inputs, self.trainoutputs_shapes)
-        if comp_minimum_objects[0]:
-            test_minimum_objects_inputs = [x[0] for x in self.testinput_objects_dims]
-            train_dim_preds = apply_basic_math(comp_minimum_objects[1], comp_minimum_objects[2], minimum_objects_inputs)
-            test_dim_preds = apply_basic_math(comp_minimum_objects[1], comp_minimum_objects[2], test_minimum_objects_inputs)
-            if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
-                return 'deduced',  train_dim_preds, test_dim_preds
+        if all([len(x) > 0 for x in self.traininput_objects_dims]):
+            minimum_objects_inputs = [x[0] for x in self.traininput_objects_dims]
+            comp_minimum_objects = screen_basic_math(minimum_objects_inputs, self.trainoutputs_shapes)
+            if comp_minimum_objects[0]:
+                test_minimum_objects_inputs = [x[0] for x in self.testinput_objects_dims]
+                train_dim_preds = apply_basic_math(comp_minimum_objects[1], comp_minimum_objects[2], minimum_objects_inputs)
+                test_dim_preds = apply_basic_math(comp_minimum_objects[1], comp_minimum_objects[2], test_minimum_objects_inputs)
+                if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
+                    return 'deduced',  train_dim_preds, test_dim_preds
 
-        maximum_objects_inputs = [x[len(x) - 1] for x in self.traininput_objects_dims]
-        comp_maximum_objects = screen_basic_math(maximum_objects_inputs, self.trainoutputs_shapes)
-        if comp_maximum_objects[0]:
-            test_maximum_objects_inputs = [x[len(x) - 1] for x in self.testinput_objects_dims]
-            train_dim_preds = apply_basic_math(comp_maximum_objects[1], comp_maximum_objects[2], maximum_objects_inputs)
-            test_dim_preds = apply_basic_math(comp_maximum_objects[1], comp_maximum_objects[2], test_maximum_objects_inputs)
-            if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
-                return 'deduced',  train_dim_preds, test_dim_preds
+            maximum_objects_inputs = [x[len(x) - 1] for x in self.traininput_objects_dims]
+            comp_maximum_objects = screen_basic_math(maximum_objects_inputs, self.trainoutputs_shapes)
+            if comp_maximum_objects[0]:
+                test_maximum_objects_inputs = [x[len(x) - 1] for x in self.testinput_objects_dims]
+                train_dim_preds = apply_basic_math(comp_maximum_objects[1], comp_maximum_objects[2], maximum_objects_inputs)
+                test_dim_preds = apply_basic_math(comp_maximum_objects[1], comp_maximum_objects[2], test_maximum_objects_inputs)
+                if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
+                    return 'deduced',  train_dim_preds, test_dim_preds
 
         return 'undeduced', [], []
 

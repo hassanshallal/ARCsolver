@@ -830,29 +830,3 @@ def screen_flips_rotation(in_, out_):
         return np.fliplr, None
     else:
         return None, None
-
-
-def is_out_obj_in_in_objs(out_obj, in_objs):
-    for obj in in_objs:
-        if obj[1] - obj[0] == out_obj[1] - out_obj[0] and obj[3] - obj[2] == out_obj[3] - out_obj[2]:
-            return True
-    return False
-
-def direct_obj_movement_detection(out_objs, in_objs):
-    if len(out_objs) == len(in_objs):
-        for n in range(len(out_objs)):
-            if is_out_obj_in_in_objs(out_objs[n], in_objs) == False:
-                return False
-        return True
-    return False
-
-def one_obj_move(in_objs, out_objs):
-    moved = []
-    for n in range(len(out_objs)):
-        if out_objs[n] not in in_objs:
-            for m in range(len(in_objs)):
-                if out_objs[n][0] != in_objs[m][0] and out_objs[n][1] != in_objs[m][1] and out_objs[n][2] == in_objs[m][2] and out_objs[n][3] == in_objs[m][3]:
-                    moved.append(True)
-                elif out_objs[n][0] == in_objs[m][0] and out_objs[n][1] == in_objs[m][1] and out_objs[n][2] != in_objs[m][2] and out_objs[n][3] != in_objs[m][3]:
-                    moved.append(True)
-    return all(moved) and len(moved) > 0

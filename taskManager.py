@@ -49,6 +49,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
         # prepare relevant info for your tests conditionally on presence of testoutputs
         self.traininputs_bg = [get_background(n) for n in self.traininputs]
+        self.trainoutputs_bg = [get_background(n) for n in self.trainoutputs]
         self.testinputs_bg = [get_background(n) for n in self.testinputs]
 
         # assess bg and apply deductive routines to the task
@@ -83,7 +84,11 @@ class TaskManager: # works on a task by task level, there are checks and balance
     # Methods
     def assess_bg_situation(self):
         traininputs_bg_set = set(self.traininputs_bg)
-        if len(traininputs_bg_set) == 1:
+        trainoutputs_bg_set = set(self.trainoutputs_bg)
+        if 0 in traininputs_bg_set and 0 in trainoutputs_bg_set:
+            global_bg = True
+            bg = 0
+        elif len(traininputs_bg_set) == 1:
             global_bg = True
             bg = traininputs_bg_set.pop()
             bg = int(bg) #it is coming as numpy.int64 not int
@@ -91,6 +96,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
             global_bg = False
             bg = self.traininputs_bg
         return global_bg, bg
+
 
     def expose_deductive(self):
         if self.is_similar_dim and type(self.bg) == int:

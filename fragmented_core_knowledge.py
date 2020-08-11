@@ -22,9 +22,6 @@ class Fragmented:
         self.what_relation = [list_comparator(x, y) for x, y in zip(self.traininput_shapes, self.trainoutputs_shapes)]
         self.int_div = [get_int_div(x, y) for x, y in zip(self.traininput_shapes, self.trainoutputs_shapes)]
 
-        self.traininput_objects = [extract_objects(x) for x in self.cur_train_preds]
-        self.trainoutput_objects = [extract_objects(x) for x in self.trainoutputs]
-        self.testinput_objects = [extract_objects(x) for x in self.cur_test_preds]
 
         # logical Factors
         self.unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
@@ -42,16 +39,6 @@ class Fragmented:
         self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.int_div])
         self.is_one_row_output = all([x[0] == 1 and x[1] >= 1 for x in self.trainoutputs_shapes])
         self.is_one_column_output = all([x[1] == 1 and x[0] >= 1 for x in self.trainoutputs_shapes])
-        self.cond1 = all([len(x) == 1 for x in self.trainoutput_objects])
-        self.cond2 = all([len(self.trainoutput_objects[n]) > 0 and self.trainoutput_objects[n][0][0] == 0 and self.trainoutput_objects[n][0][0] == self.trainoutput_objects[n][0][2] for n in range(len(self.trainoutput_objects))])
-        self.cond3 = all([len(self.trainoutput_objects[n]) > 0 and is_out_obj_in_in_objs(self.trainoutput_objects[n][0], self.traininput_objects[n]) for n in range(len(self.trainoutput_objects))])
-        self.cond4 = all([x == [[0, 1, 0, 1]] or x == [] for x in self.trainoutput_objects])
-        self.cond5 = all([len(x) == len(y) for x, y in zip(self.traininput_objects, self.trainoutput_objects)])
-        self.cond6 = all([direct_obj_movement_detection(x, y) for x, y in zip(self.traininput_objects, self.trainoutput_objects)])
-        self.cond7 = all([one_obj_move(x, y) for x, y in zip(self.traininput_objects, self.trainoutput_objects)])
-        self.cond8 = all([len(x) < len(y) for x, y in zip(self.traininput_objects, self.trainoutput_objects)])
-        self.cond9 = all([len(x) == 0 for x in self.traininput_objects])
-        self.cond10 = all([sorted(x) == sorted(y) for x, y in zip(self.traininput_objects, self.trainoutput_objects)])
         self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.cognify_dimensions()
 
     # Recieve cargo
@@ -159,13 +146,6 @@ class Fragmented:
                 #print('d_c_8')
                 return 'deduced', [(x, 1) for x in self.freq_nonbg_traininputs], [(x, 1) for x in self.freq_nonbg_testinputs]
 
-        elif self.cond1 and self.cond2 and self.cond3:
-            #print('d_c_9')
-            # output an object [30, 35, 48, 87]: one out object and it is one of the in objects:
-            train_traininput_objects = [extract_objects(x) for x in self.cur_train_preds]
-            test_traininput_objects = [extract_objects(x) for x in self.cur_test_preds]
-            return 'object_deduced', train_traininput_objects, test_traininput_objects
-        #print('d_c_10')
         return 'undeduced', [tuple(x) for x in self.traininput_shapes], [tuple(x) for x in self.testinput_shapes]
 
     def get_dimension_cognified(self):

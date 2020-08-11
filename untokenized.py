@@ -8,7 +8,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import numpy as np
-from scipy.ndimage import label, find_objects
+from operator import and_, or_
+from functools import reduce
+
+from neighbors import *
 
 ## Book-keeping, I/O section
 # This is to serialize the opjects
@@ -192,25 +195,130 @@ def get_sorted_frequency_situation(x):
     freqs = np.unique(x, return_counts = True)
     return sort_two_lists_based_on_second(freqs[0].tolist(), freqs[1].tolist())
 
-def extract_objects(x):
-    _objects = find_objects(x)
-    # labels, numobjects = label(x) # we introduced this, it decreses the number from 363 to 375, but it may be letter.
-    # _objects = find_objects(labels)
-    # if len(_objects) > 4:
+def get_coordinates_from_arr(x, in_):
+    if type(in_) == list:
+        coordinates = []
+        for n in range(len(in_)):
+            this_in_ = in_[n]
+            target_indices = np.argwhere(this_in_ == x)
+            coordinates.append(target_indices)
+        return coordinates
+    else:
+        target_indices = np.argwhere(in_ == x)
+        return target_indices
 
-    extracted = []
-    for obj in _objects:
-        if obj != None:
-            this_object_data = [list(obj)[0].start, list(obj)[0].stop, list(obj)[1].start, list(obj)[1].stop, (list(obj)[0].stop - list(obj)[0].start), (list(obj)[1].stop - list(obj)[1].start)]
-            this_object_in_x = x[this_object_data[0]:this_object_data[0]+this_object_data[4], this_object_data[2]:this_object_data[2]+this_object_data[5]]
-            vals, counts = np.unique(this_object_in_x, return_counts = True)
-            vals = vals.tolist()
-            counts = counts.tolist()
-            max_index = counts.index(max(counts))
-            min_index = counts.index(min(counts))
-            this_object_data = this_object_data + [vals[max_index], vals[min_index], len(vals)]
-            extracted.append(this_object_data)
-    return extracted
+def get_coords_for_vals(in_, global_bg, bg):
+    # print('get coords of vals in_', in_)
+    freqs =  np.unique(in_)
+    val_to_coord = {}
+    for m in freqs:
+        val_to_coord[m] = get_coordinates_from_arr(m, in_)
+
+    if global_bg and bg in freqs:
+        del val_to_coord[bg]
+    # print('val_to_coord', val_to_coord)
+    return val_to_coord
+
+def merge_intersecting_pairs(intersecting_pairs_list):
+    to_exclude = []
+    for n in range(len(intersecting_pairs_list) - 1):
+        is_intersect = len(set(intersecting_pairs_list[n]).intersection(intersecting_pairs_list[n+1]))
+        if is_intersect > 0:
+            to_exclude.append(n)
+            intersecting_pairs_list[n+1] = set(intersecting_pairs_list[n]).union(intersecting_pairs_list[n+1])
+
+    return [set(intersecting_pairs_list[i]) for i in range(len(intersecting_pairs_list)) if i not in to_exclude]
+
+def extract_objects(in_, global_bg, bg):
+    val_to_coord = get_coords_for_vals(in_, global_bg, bg)
+    # print('len val_to_coord keys:', len(val_to_coord))
+    # print('val_to_coord keys:', val_to_coord.keys())
+    singles = set()
+    val_to_objects = {}
+
+    for k, v in list(val_to_coord.items()):
+        nb_results = [neighbor_situation(in_, x[0], x[1]) for x in v]
+        check0 = [k in nb_results[x][3].keys() for x in range(len(v))]
+        for n in range(len(check0)):
+            if check0[n] and n == 0:
+                val_to_objects[(k, tuple(v[n]))] = [v[n].tolist()]
+            elif check0[n] and n > 0:
+                current_neighbors = nb_results[n][2][k]
+                assigned = False
+                for key, value in list(val_to_objects.items()):
+                    intersect = [list(x) for x in set(tuple(x) for x in current_neighbors).intersection(set(tuple(x) for x in value))]
+                    if len(intersect) > 0:
+                        val_to_objects[key].append(v[n].tolist())
+                        assigned = True
+                if not assigned:
+                    val_to_objects[(k, tuple(v[n]))] = [v[n].tolist()]
+            else:
+                singles.add((k, tuple(v[n])))
+
+    # fix issues related to having no control over the order of testing coordinates
+    # Bookkeeping is hard but doable and safe
+    reviewed = {}
+    list_of_keys = list(val_to_objects.keys())
+    values_of_keys = [x[0] for x in list_of_keys]
+    unique_values_of_keys = sorted(np.unique(np.array(values_of_keys)).tolist())
+    for q in unique_values_of_keys:
+        keys_of_q = [x for x in list_of_keys if x[0] == q]
+        sets_of_q = [set(tuple(x) for x in val_to_objects[key]) for key in keys_of_q]
+
+        if len(keys_of_q) > 1:
+            combs = sorted(list(combinations([x for x in range(len(sets_of_q))], 2)))
+
+            combs_intersections = [sets_of_q[x[0]].intersection(sets_of_q[x[1]]) for x in combs]
+            comb_intersections_length = [len(x) > 0 for x in combs_intersections]
+            found_intersecting_pairs = [combs[i] for i in range(len(combs)) if comb_intersections_length[i]]
+            intersecting_collections = merge_intersecting_pairs(found_intersecting_pairs)
+            if len(intersecting_collections) > 0:
+                non_intersecting = [i for i in range(len(sets_of_q)) if i not in reduce(or_, intersecting_collections)]
+            else:
+                non_intersecting = [i for i in range(len(sets_of_q))]
+
+            for l in non_intersecting:
+                reviewed[keys_of_q[l]] = val_to_objects[keys_of_q[l]]
+            for l in intersecting_collections:
+                reviewed[keys_of_q[min(l)]] = reduce(or_, [sets_of_q[d] for d in l])
+        else:
+            reviewed[keys_of_q[0]] = val_to_objects[keys_of_q[0]]
+    # get the signatures of your objects, collect these signatures and label them or not
+    vals_to_object_signature1 = {}
+    vals_to_object_signature2 = {}
+    for k, v in list(reviewed.items()):
+        vals_to_object_signature1[k] = [neighbor_situation(in_, x[0], x[1])[3][k[0]] for x in v]
+        vals_to_object_signature2[k] = [neighbor_situation(in_, x[0], x[1])[1][k[0]] for x in v]
+
+    # configure objects, must be done:
+    # [r.start, r.stop, c.start, c.stop, r_dim, c_dim, most_freq, min_freq, num_unique, num_cell_most_freq, num_cells_not_most_freq]
+    trimmed_objects = []
+    #print('reviewed:', reviewed)
+    for k, v in reviewed.items():
+        min_r = min([x[0] for x in v])
+        max_r = max([x[0] for x in v])
+        min_c = min([x[1] for x in v])
+        max_c = max([x[1] for x in v])
+        this_object_data = [min_r, max_r + 1, min_c, max_c + 1, max_r - min_r + 1, max_c - min_c + 1]
+        this_object_in_in = in_[this_object_data[0]:this_object_data[1], this_object_data[2]:this_object_data[3]]
+        vals, counts = np.unique(this_object_in_in, return_counts = True)
+        vals = vals.tolist()
+        counts = counts.tolist()
+        if global_bg and bg in vals:
+            bg_ind_in_freq = vals.index(bg)
+            vals.remove(bg)
+            counts.remove(counts[bg_ind_in_freq])
+
+        target_ind = vals.index(k[0])
+        max_index = counts.index(max(counts))
+        min_index = counts.index(min(counts))
+        this_object_data = this_object_data + [vals[target_ind], counts[target_ind], vals[max_index], counts[max_index], vals[min_index],  counts[min_index],  len(vals), sum(counts)]
+        trimmed_objects.append(this_object_data)
+
+    if len(trimmed_objects) > 0: # make sure we have no duplicates when two objects compose into one
+        trimmed_objects = [list(x) for x in set(tuple(x) for x in trimmed_objects)]
+    # singles, reviewed, vals_to_object_signature1, vals_to_object_signature2
+    return trimmed_objects
 
 def get_dims_objects(object_lists):
     object_dims = []
@@ -229,7 +337,7 @@ def get_freqs_object(object_lists):
 def sort_objects_dims_by_size(objects_list):
     sorted_objects_by_size = []
     for m in objects_list:
-        m.sort(key = lambda x: x[4]*x[5])
+        m.sort(key = lambda x: (-x[11], x[12], x[4]*x[5])) # (-x[13], x[14], x[4]*x[5])
         sorted_objects_by_size.append(m)
     return sorted_objects_by_size
 
@@ -390,15 +498,3 @@ def series_analyzer(series_list):
             return True, new_series
         else:
             return False, series_list
-
-def get_coordinates_from_arr(x, in_):
-    if type(in_) == list:
-        coordinates = []
-        for n in range(len(in_)):
-            this_in_ = in_[n]
-            target_indices = np.argwhere(this_in_ == x)
-            coordinates.append(target_indices)
-        return coordinates
-    else:
-        target_indices = np.argwhere(in_ == x)
-        return target_indices
