@@ -253,6 +253,7 @@ def extract_objects(in_, global_bg, bg):
                 if not assigned:
                     val_to_objects[(k, tuple(v[n]))] = [v[n].tolist()]
             else:
+                val_to_objects[(k, tuple(v[n]))] = [v[n].tolist()]
                 singles.add((k, tuple(v[n])))
 
     # fix issues related to having no control over the order of testing coordinates
@@ -287,8 +288,9 @@ def extract_objects(in_, global_bg, bg):
     vals_to_object_signature1 = {}
     vals_to_object_signature2 = {}
     for k, v in list(reviewed.items()):
-        vals_to_object_signature1[k] = [neighbor_situation(in_, x[0], x[1])[3][k[0]] for x in v]
-        vals_to_object_signature2[k] = [neighbor_situation(in_, x[0], x[1])[1][k[0]] for x in v]
+        if len(v) > 1:
+            vals_to_object_signature1[k] = [neighbor_situation(in_, x[0], x[1])[3][k[0]] for x in v]
+            vals_to_object_signature2[k] = [neighbor_situation(in_, x[0], x[1])[1][k[0]] for x in v]
 
     # configure objects, must be done:
     # [r.start, r.stop, c.start, c.stop, r_dim, c_dim, most_freq, min_freq, num_unique, num_cell_most_freq, num_cells_not_most_freq]
