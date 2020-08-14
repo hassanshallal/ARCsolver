@@ -15,11 +15,9 @@ class ARCsolver:
         self.freqs_testinputs = [get_sorted_frequency_situation(x) for x in self.testinputs]
 
         # assess bg and apply deductive routines to the task
-        self.traininputs_bg = [x[0][0] for x in self.freqs_traininputs]
-        self.trainoutputs_bg = [x[0][0] for x in self.freqs_trainoutputs]
-        self.testinputs_bg = [x[0][0]  for x in self.freqs_testinputs]
-        self.global_bg, self.bg = self.assess_bg_situation()
-
+        self.global_bg, self.traininputs_bg, self.trainoutputs_bg, self.testinputs_bg = self.assess_bg_situation()
+        self.legitimate_bg_cutoff = 0.52
+        self.is_bg_not_component = self.is_bg_or_comp()
         # dimensions initial processing
         self.traininputs_shapes = [list(x.shape) for x in self.traininputs]
         self.trainoutputs_shapes = [list(x.shape) for x in self.trainoutputs]
@@ -36,9 +34,9 @@ class ARCsolver:
         self.is_sim_int_div = all([x == self.int_div[0] for x in self.int_div])
         self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.int_div])
 
-        self.traininput_objects = sort_objects_dims([extract_color_continious(x, y) for x, y in zip(self.traininputs, self.traininputs_bg)])
-        self.testinput_objects = sort_objects_dims([extract_color_continious(x,  y) for x, y in zip(self.testinputs, self.testinputs_bg)])
-        self.trainoutput_objects = sort_objects_dims([extract_color_continious(x, y) for x, y in zip(self.trainoutputs, self.trainoutputs_bg)])
+        self.traininput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.traininputs, self.traininputs_bg)])
+        self.testinput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.testinputs, self.testinputs_bg)])
+        self.trainoutput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.trainoutputs, self.trainoutputs_bg)])
 
         self.traininput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.traininput_objects)]
         self.testinput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.testinput_objects)]
@@ -61,7 +59,7 @@ class ARCsolver:
         # logical Factors
         self.unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
         self.is_unique_train_outputs = all([len(x) == 1 for x in self.unique_train_outputs])
-        self.bg_in_unique_train_outputs = self.bg in self.unique_train_outputs
+        # self.bg_in_unique_train_outputs = self.bg in self.unique_train_outputs
 
         self.row_dim_ouputs = [x[0] for x in self.trainoutputs_shapes]
         self.col_dim_ouputs = [x[1] for x in self.trainoutputs_shapes]
@@ -81,19 +79,64 @@ class ARCsolver:
         self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.cognify_dimensions()
 
     def assess_bg_situation(self):
-        traininputs_bg_set = set(self.traininputs_bg)
-        trainoutputs_bg_set = set(self.trainoutputs_bg)
-        if 0 in traininputs_bg_set and 0 in trainoutputs_bg_set:
-            global_bg = True
-            bg = 0
-        elif len(traininputs_bg_set) == 1:
-            global_bg = True
-            bg = traininputs_bg_set.pop()
-            bg = int(bg) #it is coming as numpy.int64 not int
+        traininputs_bg = [x[0][0] for x in self.freqs_traininputs]
+        trainoutputs_bg = [x[0][0] for x in self.freqs_trainoutputs]
+
+        is_same_couple_bg = all([x == y for x, y in zip(traininputs_bg, trainoutputs_bg)])
+
+        testinputs_bg = [x[0][0] for x in self.freqs_testinputs]
+
+        inputs_bg_set = set(traininputs_bg + testinputs_bg)
+        outputs_bg_set = set(trainoutputs_bg)
+        overall_set = inputs_bg_set.union(outputs_bg_set)
+
+        if len(overall_set) == 1:
+            bg = overall_set.pop()
+            train = [bg] * self.num_train
+            test = [bg] * self.num_test
+            return True, train, train, test
+        elif len(inputs_bg_set) == 1 and list(inputs_bg_set)[0] == 0 and len(outputs_bg_set) > 1:
+            bg = inputs_bg_set.pop()
+            train = [bg] * self.num_train
+            test = [bg] * self.num_test
+            return True, train, train, test
+        elif len(inputs_bg_set) == 1 and list(inputs_bg_set)[0] != 0 and len(outputs_bg_set) == 1 and list(outputs_bg_set)[0] == 0:
+            bg = outputs_bg_set.pop()
+            train = [bg] * self.num_train
+            test = [bg] * self.num_test
+            return True, train, train, test
+        elif len(inputs_bg_set) == 1 and list(inputs_bg_set)[0] == 0 and len(outputs_bg_set) == 1 and list(outputs_bg_set)[0] != 0:
+            input_bg = inputs_bg_set.pop()
+            output_bg = outputs_bg_set.pop()
+
+            in_train = [input_bg] * self.num_train
+            # out_train = [output_bg] * self.num_train
+            in_test = [input_bg] * self.num_test
+            return True, in_train, in_train, in_test
         else:
-            global_bg = False
-            bg = self.traininputs_bg
-        return global_bg, bg
+            overall_list = traininputs_bg + testinputs_bg
+            assessment = get_sorted_frequency_situation(fix_dim(overall_list))
+            if len(assessment[0]) > 1 and (assessment[0][0] == 0 or (assessment[0][0] != 0 and assessment[0][1] == 0 and assessment[1][0] == assessment[1][1])):
+                bg = 0
+                train = [bg] * self.num_train
+                test = [bg] * self.num_test
+                return True, train, train, test
+            else:
+                cond1 = all([0 in x[0] for x in self.freqs_traininputs])
+                cond2 = all([0 in x[0] for x in self.freqs_testinputs])
+                if cond1 and cond2:
+                    bg = 0
+                    train = [bg] * self.num_train
+                    test = [bg] * self.num_test
+                    return True, train, train, test
+                else:
+                    return False, traininputs_bg, traininputs_bg, testinputs_bg
+
+    def is_bg_or_comp(self):
+        all_counts = [x[1] for x in self.freqs_traininputs + self.freqs_testinputs]
+        bg_percent = [x[0]/np.sum(x) for x in all_counts]
+        is_legit = all([x > self.legitimate_bg_cutoff for x in bg_percent])
+        return is_legit
 
     def cognify_dimensions(self):
         if self.is_same_dim_couple:

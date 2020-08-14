@@ -191,6 +191,7 @@ def sort_two_lists_based_on_second(l1, l2):
     sorted_pairs = sorted(zipped_lists, reverse = True)
     tuples = zip(*sorted_pairs)
     list2, list1 = [list(tuple) for tuple in  tuples]
+
     return (list1, list2)
 
 def get_sorted_frequency_situation(x):
@@ -209,16 +210,16 @@ def get_coordinates_from_arr(x, in_):
         target_indices = np.argwhere(in_ == x)
         return target_indices
 
-def get_coords_for_vals(in_, bg):
+def get_coords_for_vals(in_, bg, global_bg, is_bg_not_component):
     # print('get coords of vals in_', in_)
     freqs =  np.unique(in_)
     val_to_coord = {}
     for m in freqs:
         val_to_coord[m] = get_coordinates_from_arr(m, in_)
 
+    if (global_bg or is_bg_not_component) and bg in val_to_coord.keys(): # some cases need global_bg to be True and some don't
+        del val_to_coord[bg]
 
-    del val_to_coord[bg]
-    # print('val_to_coord', val_to_coord)
     return val_to_coord
 
 def merge_intersecting_pairs(intersecting_pairs_list):
@@ -231,12 +232,11 @@ def merge_intersecting_pairs(intersecting_pairs_list):
 
     return [set(intersecting_pairs_list[i]) for i in range(len(intersecting_pairs_list)) if i not in to_exclude]
 
-
 Component = namedtuple("Component", "lead_val x_start x_stop y_start y_stop x_dim y_dim overall_size num_lead_val_coords num_non_lead_val_coords lead_percent unique_vals unique_vals_counts lead_val_coords lead_val_coords_sign1, lead_val_coords_sign2" )
 
-def extract_color_continious(in_, bg):
+def extract_color_continious(in_, bg, global_bg, is_bg_not_component):
     # this will extract all components based on color contguity
-    val_to_coord = get_coords_for_vals(in_, bg)
+    val_to_coord = get_coords_for_vals(in_, bg, global_bg, is_bg_not_component)
     singles = set()
     val_to_objects = {}
 

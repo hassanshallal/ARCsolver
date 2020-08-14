@@ -1,4 +1,5 @@
 from utils import *
+from untokenized import *
 
 def flip_test_train(task, num):
     modified_task = deepcopy(task)
@@ -26,7 +27,7 @@ def confirmer(task):
 
 class TaskManager: # works on a task by task level, there are checks and balances
     # initiation defines several data members and uses class methods so as to output a problem graph
-    def __init__(self, raw_task, forced_bg = None):
+    def __init__(self, raw_task):
         self.raw_task = raw_task
         self.num_train = len(raw_task['train'])
         self.num_test = len(raw_task['test'])
@@ -34,8 +35,14 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.traininputs, self.trainoutputs = get_training(raw_task) # this will return two lists for inputs and outputs
         self.testinputs, self.testoutputs = get_testing(raw_task)
         self.cur_train_preds, self.cur_test_preds = deepcopy(self.traininputs), deepcopy(self.testinputs)
+
         # gather general information about the dimensionality from training
         self.is_similar_dim, self.input_dims, self.output_dims = explore_dimensions(self.traininputs, self.trainoutputs)
+
+        # prepare relevant info for your tests conditionally on presence of testoutputs
+        self.freqs_traininputs = [get_sorted_frequency_situation(x) for x in self.traininputs]
+        self.freqs_trainoutputs = [get_sorted_frequency_situation(x) for x in self.trainoutputs]
+        self.freqs_testinputs = [get_sorted_frequency_situation(x) for x in self.testinputs]
 
         self.traininputs_vals = [np.unique(n).tolist() for n in self.traininputs]
         self.trainoutputs_vals = [np.unique(n).tolist() for n in self.trainoutputs]
@@ -46,19 +53,10 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.couple_similars = [get_similars(n, m) for n, m in zip(self.traininputs, self.trainoutputs)]
         self.global_similars = get_global_value_map(self.couple_similars)
 
-        # prepare relevant info for your tests conditionally on presence of testoutputs
-        self.traininputs_bg = [get_background(n) for n in self.traininputs]
-        self.trainoutputs_bg = [get_background(n) for n in self.trainoutputs]
-        self.testinputs_bg = [get_background(n) for n in self.testinputs]
 
         # assess bg and apply deductive routines to the task
-        self.global_bg, self.bg = self.assess_bg_situation()
-        if forced_bg != None:
-            self.global_bg = True
-            self.bg = forced_bg
+        self.global_bg, self.traininputs_bg, self.trainoutputs_bg, self.testinputs_bg = self.assess_bg_situation()
 
-        # deductive
-        self.deductive_coder0, self.deductive_coder1 = self.expose_deductive()
 
         # Tokenizer: alright, every task is different, but there is a global pattern in all the tasks
         all_test_input_vals = list(itertools.chain.from_iterable(self.testinputs_vals))
@@ -82,20 +80,58 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
     # Methods
     def assess_bg_situation(self):
-        traininputs_bg_set = set(self.traininputs_bg)
-        trainoutputs_bg_set = set(self.trainoutputs_bg)
-        if 0 in traininputs_bg_set and 0 in trainoutputs_bg_set:
-            global_bg = True
-            bg = 0
-        elif len(traininputs_bg_set) == 1:
-            global_bg = True
-            bg = traininputs_bg_set.pop()
-            bg = int(bg) #it is coming as numpy.int64 not int
-        else:
-            global_bg = False
-            bg = self.traininputs_bg
-        return global_bg, bg
+        traininputs_bg = [x[0][0] for x in self.freqs_traininputs]
+        trainoutputs_bg = [x[0][0] for x in self.freqs_trainoutputs]
 
+        is_same_couple_bg = all([x == y for x, y in zip(traininputs_bg, trainoutputs_bg)])
+
+        testinputs_bg = [x[0][0] for x in self.freqs_testinputs]
+
+        inputs_bg_set = set(traininputs_bg + testinputs_bg)
+        outputs_bg_set = set(trainoutputs_bg)
+        overall_set = inputs_bg_set.union(outputs_bg_set)
+
+        if len(overall_set) == 1:
+            bg = overall_set.pop()
+            train = [bg] * self.num_train
+            test = [bg] * self.num_test
+            return True, train, train, test
+        elif len(inputs_bg_set) == 1 and list(inputs_bg_set)[0] == 0 and len(outputs_bg_set) > 1:
+            bg = inputs_bg_set.pop()
+            train = [bg] * self.num_train
+            test = [bg] * self.num_test
+            return True, train, train, test
+        elif len(inputs_bg_set) == 1 and list(inputs_bg_set)[0] != 0 and len(outputs_bg_set) == 1 and list(outputs_bg_set)[0] == 0:
+            bg = outputs_bg_set.pop()
+            train = [bg] * self.num_train
+            test = [bg] * self.num_test
+            return True, train, train, test
+        elif len(inputs_bg_set) == 1 and list(inputs_bg_set)[0] == 0 and len(outputs_bg_set) == 1 and list(outputs_bg_set)[0] != 0:
+            input_bg = inputs_bg_set.pop()
+            output_bg = outputs_bg_set.pop()
+
+            in_train = [input_bg] * self.num_train
+            # out_train = [output_bg] * self.num_train
+            in_test = [input_bg] * self.num_test
+            return True, in_train, in_train, in_test
+        else:
+            overall_list = traininputs_bg + testinputs_bg
+            assessment = get_sorted_frequency_situation(fix_dim(overall_list))
+            if len(assessment[0]) > 1 and (assessment[0][0] == 0 or (assessment[0][0] != 0 and assessment[0][1] == 0 and assessment[1][0] == assessment[1][1])):
+                bg = 0
+                train = [bg] * self.num_train
+                test = [bg] * self.num_test
+                return True, train, train, test
+            else:
+                cond1 = all([0 in x[0] for x in self.freqs_traininputs])
+                cond2 = all([0 in x[0] for x in self.freqs_testinputs])
+                if cond1 and cond2:
+                    bg = 0
+                    train = [bg] * self.num_train
+                    test = [bg] * self.num_test
+                    return True, train, train, test
+                else:
+                    return False, traininputs_bg, traininputs_bg, testinputs_bg
 
     def expose_deductive(self):
         if self.is_similar_dim and type(self.bg) == int:
@@ -118,7 +154,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
 
     # This method tokenize a task based on training, it provides color_to_token, token_to_color, and problem_statements
     def tokenize(self):
-        color_to_tokens = [get_col_to_token(w, x, y, z, self.bg, self.priority_nonbg_input + self.priority_nonbg_output) for w, x, y, z in zip(self.traininputs, self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map)]
+        color_to_tokens = [get_col_to_token(w, x, y, z, bg, self.priority_nonbg_input + self.priority_nonbg_output) for w, x, y, z, bg in zip(self.traininputs, self.traininputs_vals, self.trainoutputs_vals, self.couple_val_map, self.traininputs_bg)]
         token_to_colors = [get_token_to_color(x) for x in color_to_tokens]
         problem_statements = [get_problem_statement(x, y) for x, y in zip(color_to_tokens, self.couple_val_map)]
         return color_to_tokens, token_to_colors, problem_statements
@@ -242,7 +278,7 @@ class TaskManager: # works on a task by task level, there are checks and balance
                 testinputs_vals = [np.unique(n).tolist() for n in self.testinputs]
                 final_test_nonbg = sorted(list(get_common_nonbg(testinputs_vals)))
                 for n in range(len(self.testinputs)):
-                    this_test_color_to_token = get_col_to_token_test(final_test_nonbg, pr_tokens, self.bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[n])
+                    this_test_color_to_token = get_col_to_token_test(final_test_nonbg, pr_tokens, self.testinputs_bg, self.size_sorted_nonbg, self.int_anchor_vals, self.testinputs[n])
                     test_token_to_colors.append(get_token_to_color(this_test_color_to_token))
 
         return test_token_to_colors
