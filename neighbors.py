@@ -1,5 +1,9 @@
 from utils import *
 
+bare_nb_coordinates = lambda i, j: {
+    (i+ip, j+jp) for ip, jp in product([1, -1, 0], repeat=2)
+}
+
 nbh = lambda arr, i, j: {
     (ip, jp) : arr[i+ip, j+jp]
         for ip, jp in product([1, -1, 0], repeat=2)

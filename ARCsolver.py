@@ -36,9 +36,14 @@ class ARCsolver:
         self.is_sim_int_div = all([x == self.int_div[0] for x in self.int_div])
         self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.int_div])
 
-        self.traininput_objects = sort_objects_dims_by_size([extract_objects(x, self.global_bg, self.bg) for x in self.traininputs])
-        self.testinput_objects = sort_objects_dims_by_size([extract_objects(x, self.global_bg, self.bg) for x in self.testinputs])
-        self.trainoutput_objects = sort_objects_dims_by_size([extract_objects(x, self.global_bg, self.bg) for x in self.trainoutputs])
+        self.traininput_objects = sort_objects_dims([extract_color_continious(x, y) for x, y in zip(self.traininputs, self.traininputs_bg)])
+        self.testinput_objects = sort_objects_dims([extract_color_continious(x,  y) for x, y in zip(self.testinputs, self.testinputs_bg)])
+        self.trainoutput_objects = sort_objects_dims([extract_color_continious(x, y) for x, y in zip(self.trainoutputs, self.trainoutputs_bg)])
+
+        self.traininput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.traininput_objects)]
+        self.testinput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.testinput_objects)]
+        self.trainoutput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.trainoutput_objects)]
+
         self.traininput_objects_dims = get_dims_objects(self.traininput_objects)
         self.testinput_objects_dims = get_dims_objects(self.testinput_objects)
 

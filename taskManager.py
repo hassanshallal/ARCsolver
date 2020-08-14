@@ -34,7 +34,6 @@ class TaskManager: # works on a task by task level, there are checks and balance
         self.traininputs, self.trainoutputs = get_training(raw_task) # this will return two lists for inputs and outputs
         self.testinputs, self.testoutputs = get_testing(raw_task)
         self.cur_train_preds, self.cur_test_preds = deepcopy(self.traininputs), deepcopy(self.testinputs)
-
         # gather general information about the dimensionality from training
         self.is_similar_dim, self.input_dims, self.output_dims = explore_dimensions(self.traininputs, self.trainoutputs)
 

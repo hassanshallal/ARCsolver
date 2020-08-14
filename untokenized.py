@@ -10,6 +10,8 @@ from matplotlib import colors
 import numpy as np
 from operator import and_, or_
 from functools import reduce
+from collections import namedtuple
+import random
 
 from neighbors import *
 
@@ -207,15 +209,15 @@ def get_coordinates_from_arr(x, in_):
         target_indices = np.argwhere(in_ == x)
         return target_indices
 
-def get_coords_for_vals(in_, global_bg, bg):
+def get_coords_for_vals(in_, bg):
     # print('get coords of vals in_', in_)
     freqs =  np.unique(in_)
     val_to_coord = {}
     for m in freqs:
         val_to_coord[m] = get_coordinates_from_arr(m, in_)
 
-    if global_bg and bg in freqs:
-        del val_to_coord[bg]
+
+    del val_to_coord[bg]
     # print('val_to_coord', val_to_coord)
     return val_to_coord
 
@@ -229,10 +231,12 @@ def merge_intersecting_pairs(intersecting_pairs_list):
 
     return [set(intersecting_pairs_list[i]) for i in range(len(intersecting_pairs_list)) if i not in to_exclude]
 
-def extract_objects(in_, global_bg, bg):
-    val_to_coord = get_coords_for_vals(in_, global_bg, bg)
-    # print('len val_to_coord keys:', len(val_to_coord))
-    # print('val_to_coord keys:', val_to_coord.keys())
+
+Component = namedtuple("Component", "lead_val x_start x_stop y_start y_stop x_dim y_dim overall_size num_lead_val_coords num_non_lead_val_coords lead_percent unique_vals unique_vals_counts lead_val_coords lead_val_coords_sign1, lead_val_coords_sign2" )
+
+def extract_color_continious(in_, bg):
+    # this will extract all components based on color contguity
+    val_to_coord = get_coords_for_vals(in_, bg)
     singles = set()
     val_to_objects = {}
 
@@ -257,7 +261,6 @@ def extract_objects(in_, global_bg, bg):
                 singles.add((k, tuple(v[n])))
 
     # fix issues related to having no control over the order of testing coordinates
-    # Bookkeeping is hard but doable and safe
     reviewed = {}
     list_of_keys = list(val_to_objects.keys())
     values_of_keys = [x[0] for x in list_of_keys]
@@ -284,6 +287,7 @@ def extract_objects(in_, global_bg, bg):
                 reviewed[keys_of_q[min(l)]] = reduce(or_, [sets_of_q[d] for d in l])
         else:
             reviewed[keys_of_q[0]] = val_to_objects[keys_of_q[0]]
+
     # get the signatures of your objects, collect these signatures and label them or not
     vals_to_object_signature1 = {}
     vals_to_object_signature2 = {}
@@ -291,82 +295,112 @@ def extract_objects(in_, global_bg, bg):
         if len(v) > 1:
             vals_to_object_signature1[k] = [neighbor_situation(in_, x[0], x[1])[3][k[0]] for x in v]
             vals_to_object_signature2[k] = [neighbor_situation(in_, x[0], x[1])[1][k[0]] for x in v]
-
     # configure objects, must be done:
-    # [r.start, r.stop, c.start, c.stop, r_dim, c_dim, most_freq, min_freq, num_unique, num_cell_most_freq, num_cells_not_most_freq]
     trimmed_objects = []
     #print('reviewed:', reviewed)
     for k, v in reviewed.items():
-        min_r = min([x[0] for x in v])
-        max_r = max([x[0] for x in v])
-        min_c = min([x[1] for x in v])
-        max_c = max([x[1] for x in v])
-        this_object_data = [min_r, max_r + 1, min_c, max_c + 1, max_r - min_r + 1, max_c - min_c + 1]
-        this_object_in_in = in_[this_object_data[0]:this_object_data[1], this_object_data[2]:this_object_data[3]]
-        vals, counts = np.unique(this_object_in_in, return_counts = True)
-        vals = vals.tolist()
-        counts = counts.tolist()
-        if global_bg and bg in vals:
-            bg_ind_in_freq = vals.index(bg)
-            vals.remove(bg)
-            counts.remove(counts[bg_ind_in_freq])
+        v = list(v)
+        v.sort(key = lambda x:(x[0], x[1]))
+        x_start = min([x[0] for x in v])
+        x_stop = max([x[0] for x in v]) + 1
+        y_start = min([x[1] for x in v])
+        y_stop = max([x[1] for x in v]) + 1
+        x_dim = x_stop - x_start
+        y_dim = y_stop - y_start
+        overall_size = x_dim*y_dim
+        lead_percent = round(len(v) / overall_size, 3)
+        if len(v) == 1:
+            sign1, sign2 = None, None
+        elif len(v) > 1:
+            sign1, sign2 = vals_to_object_signature1[k], vals_to_object_signature2[k]
+        this_object = in_[x_start:x_stop, y_start:y_stop]
+        freqs = np.unique(this_object, return_counts = True)
+        vals, counts = sort_two_lists_based_on_second(freqs[0], freqs[1])
 
-        target_ind = vals.index(k[0])
-        max_index = counts.index(max(counts))
-        min_index = counts.index(min(counts))
-        this_object_data = this_object_data + [vals[target_ind], counts[target_ind], vals[max_index], counts[max_index], vals[min_index],  counts[min_index],  len(vals), sum(counts)]
-        trimmed_objects.append(this_object_data)
-
-    if len(trimmed_objects) > 0: # make sure we have no duplicates when two objects compose into one
-        trimmed_objects = [list(x) for x in set(tuple(x) for x in trimmed_objects)]
-    # singles, reviewed, vals_to_object_signature1, vals_to_object_signature2
-    return trimmed_objects
+        trimmed_objects.append(Component(k[0], x_start, x_stop, y_start, y_stop, x_dim, y_dim, overall_size, len(v), overall_size - len(v), lead_percent, vals, counts, v, sign1, sign2))
+    return trimmed_objects # trimmed objects represent all the single color contigious components.
 
 def get_dims_objects(object_lists):
     object_dims = []
     for n in range(len(object_lists)):
         this_case = object_lists[n]
-        object_dims.append([x[4:6] for x in this_case])
+        object_dims.append([[x.x_dim, x.y_dim] for x in this_case])
     return object_dims
 
-def get_freqs_object(object_lists):
-    object_freqs = []
-    for n in range(len(object_lists)):
-        this_case = object_lists[n]
-        object_freqs.append([x[6:9] for x in this_case])
-    return object_freqs
-
-def sort_objects_dims_by_size(objects_list):
+def sort_objects_dims(objects_list):
     sorted_objects_by_size = []
     for m in objects_list:
-        m.sort(key = lambda x: (-x[11], x[12], x[4]*x[5])) # (-x[13], x[14], x[4]*x[5])
+        m = sorted(m, key=lambda x: (x.overall_size, x.lead_percent)) # (x.lead_percent, x.overall_size)
         sorted_objects_by_size.append(m)
     return sorted_objects_by_size
 
-def is_out_obj_in_in_objs(out_obj, in_objs):
-    for obj in in_objs:
-        if obj[1] - obj[0] == out_obj[1] - out_obj[0] and obj[3] - obj[2] == out_obj[3] - out_obj[2]:
-            return True
-    return False
-
-def direct_obj_movement_detection(out_objs, in_objs):
-    if len(out_objs) == len(in_objs):
-        for n in range(len(out_objs)):
-            if is_out_obj_in_in_objs(out_objs[n], in_objs) == False:
-                return False
+def two_points_all_nb(point1, point2):
+    # each point is a (x, y) coord
+    point_1_nbs = bare_nb_coordinates(point1[0], point1[1])
+    point_1_nbs.remove((point1[0], point1[1]))
+    if tuple(point2) in point_1_nbs:
         return True
+    else:
+        return False
+
+def do_spatial_overlap(comp1, comp2):
+    # your components have the coordinates, the goal is to find a point of overlap or a point of contact,
+    # define a function for when two points are in contact, this is supposed to be in neighbor search
+    # two have same lead_val, they are spatially isolated by default:
+    if(comp1.lead_val > comp2.lead_val):
+        return False
+    # one component above the other
+    if(comp1.x_start > comp2.x_stop or comp2.x_start > comp1.x_stop):
+        return False
+    # one component to the side of the other
+    if(comp1.y_start > comp2.y_stop or comp2.y_start > comp1.y_stop):
+        return False
+
+    # we need to make sure none of the specific lead values are in touch
+    # if we don't do this, we miss on [36, 41, 71, 96, 98, 106, 108, 136, 142]
+    l1 = comp1.lead_val_coords
+    l2 = comp2.lead_val_coords
+    for coord1 in l1:
+        for coord2 in l2:
+            if two_points_all_nb(coord1, coord2):
+                return True
     return False
 
-def one_obj_move(in_objs, out_objs):
-    moved = []
-    for n in range(len(out_objs)):
-        if out_objs[n] not in in_objs:
-            for m in range(len(in_objs)):
-                if out_objs[n][0] != in_objs[m][0] and out_objs[n][1] != in_objs[m][1] and out_objs[n][2] == in_objs[m][2] and out_objs[n][3] == in_objs[m][3]:
-                    moved.append(True)
-                elif out_objs[n][0] == in_objs[m][0] and out_objs[n][1] == in_objs[m][1] and out_objs[n][2] != in_objs[m][2] and out_objs[n][3] != in_objs[m][3]:
-                    moved.append(True)
-    return all(moved) and len(moved) > 0
+def extract_spatial_continious(in_color_components):
+    connected_couples = []
+    for n in range(len(in_color_components)):
+        for m in range(len(in_color_components)):
+            if (m, n) not in connected_couples and n != m:
+                comp1 = in_color_components[n]
+                comp2 = in_color_components[m]
+                current_overlap = do_spatial_overlap(comp1, comp2)
+                if current_overlap:
+                    connected_couples.append((n, m))
+    connected_couples.sort(key = lambda x:(x[0], x[1]))
+    #connected_couples = merge_intersecting_pairs(connected_couples)
+    # merge 5 times
+    n = 0
+    while n < len(in_color_components):
+        if n >= 3: # This can be done programmatically by testing for any intersection between any lists and do some intense bookkeeping, do this latter
+            connected_couples = random.sample(connected_couples, len(connected_couples))
+        connected_couples = merge_intersecting_pairs(connected_couples)
+        n += 1
+
+    # add single unmapped components, now, we have to have the number of spatial components smaller than or equal to the number of color components, doesn't really get any basic more than this.
+    whole = [False] * len(in_color_components)
+    if len(connected_couples) > 0:
+        mapped_components = set(set.union(*map(set, connected_couples)))
+    else:
+        mapped_components = {}
+
+    for n in range(len(in_color_components)):
+        if n in mapped_components:
+            whole[n] = True
+    to_add = [i for i in range(len(whole)) if whole[i] == False]
+    for add_it in to_add:
+        connected_couples.append({add_it})
+
+    return connected_couples
 
 def get_diagonal_mirror(arr):
     arr = fix_dim(arr)
