@@ -21,7 +21,6 @@ def get_edge_access_space(l):
     assert len(edge_space) == 16
     return edge_space
 
-
 def get_individual_edges(maze):
         dim_0 = maze.shape[0]
         dim_1 = maze.shape[1]

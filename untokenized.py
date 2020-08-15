@@ -13,6 +13,7 @@ from functools import reduce
 from collections import namedtuple
 import random
 
+from edges import *
 from neighbors import *
 
 ## Book-keeping, I/O section
@@ -534,3 +535,88 @@ def series_analyzer(series_list):
             return True, new_series
         else:
             return False, series_list
+
+def apply_transform_map(in_, transform_map):
+    dim_0 = in_.shape[0]
+    dim_1 = in_.shape[1]
+
+    vals_set = set(transform_map.values())
+    if len(vals_set) > 0:
+        this_type = type(vals_set.pop())
+        if this_type == object or this_type != np.int64:
+            tokenized_situation = np.empty((dim_0, dim_1), dtype = object)
+        elif this_type == int:
+            tokenized_situation = np.empty((dim_0, dim_1), dtype = np.int64)
+    else:
+        this_type = object
+        tokenized_situation = np.empty((dim_0, dim_1), dtype = object)
+
+    visited = np.empty((dim_0, dim_1), dtype = bool)
+
+    for n in range(dim_0):
+        for m in range(dim_1):
+            visited[n, m]  = False
+
+    for n in range(dim_0):
+        for m in range(dim_1):
+            if in_[n, m] in transform_map.keys() and visited[n, m] == False:
+                tokenized_situation[n, m] = transform_map[in_[n, m]]
+                visited[n, m] = True
+            elif in_[n, m] not in transform_map.keys() and visited[n, m] == False:
+                if this_type == object:
+                    tokenized_situation[n, m] = str(in_[n, m])
+                else:
+                    tokenized_situation[n, m] = in_[n, m]
+                visited[n, m] = True
+
+    return tokenized_situation
+
+def get_x_y_situation(in_):
+    dim_0 = in_.shape[0]
+    dim_1 = in_.shape[1]
+    x_situation = np.empty((dim_0, dim_1), dtype = np.int64)
+    y_situation = np.empty((dim_0, dim_1), dtype = np.int64)
+
+    for n in range(dim_0):
+        for m in range(dim_1):
+            x_situation[n, m] = n
+            y_situation[n, m] = m
+
+    return x_situation, y_situation
+
+def get_frequency_situation(in_, freqs_traininput):
+    sorting_dict = {}
+    for x in range(len(freqs_traininput[0])):
+        sorting_dict[freqs_traininput[0][x]] = x
+
+    i = len(freqs_traininput[0]) - 1
+    reverse_sorting_dict = {}
+    reverse_order = 0
+    while i >= 0:
+        reverse_sorting_dict[freqs_traininput[0][i]] = reverse_order
+        reverse_order += 1
+        i -= 1
+    return apply_transform_map(in_, sorting_dict), apply_transform_map(in_, reverse_sorting_dict)
+
+def build_prior_knowledge(in_, freqs_traininput, traininput_bg):
+    x_situation, y_situation = get_x_y_situation(in_)
+    most_freq_lead_frequency_graph, least_freq_lead_frequency_graph = get_frequency_situation(in_, freqs_traininput) # get_frequency_situation gives two sorted and reverse sorted graphs to cover for the 2nd largest or the thisd smallest
+    edge_situation = get_edge_situation(in_, traininput_bg)
+
+    num_neighbors, nb_space_situation, most_common_neighbor, least_common_neighbor = neighbor_situation_whole(in_)
+
+    comb0 = edge_situation + most_freq_lead_frequency_graph
+    comb1 = num_neighbors + most_freq_lead_frequency_graph
+    comb2 = nb_space_situation + most_freq_lead_frequency_graph
+
+    comb3 = edge_situation + least_freq_lead_frequency_graph
+    comb4 = num_neighbors + least_freq_lead_frequency_graph
+    comb5 = nb_space_situation + least_freq_lead_frequency_graph
+
+    comb6 = edge_situation + num_neighbors
+    comb7 = edge_situation + nb_space_situation
+
+    comb8 = num_neighbors * nb_space_situation
+
+
+    return np.stack((in_, x_situation, y_situation, most_freq_lead_frequency_graph, least_freq_lead_frequency_graph, edge_situation, num_neighbors, nb_space_situation, most_common_neighbor, least_common_neighbor, comb7), axis = 0) # , comb0, comb1, comb2, comb3, comb4, comb5

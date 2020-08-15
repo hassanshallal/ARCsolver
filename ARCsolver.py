@@ -8,7 +8,8 @@ class ARCsolver:
         self.num_test = len(raw_task['test'])
         self.traininputs, self.trainoutputs = get_training(raw_task)
         self.testinputs, self.testoutputs = get_testing(raw_task) # For tasks where there is no output, testoutputs is an empty list
-
+        self.cur_train_preds, self.cur_test_preds = deepcopy(self.traininputs), deepcopy(self.testinputs)
+        
         # prepare relevant info for your tests conditionally on presence of testoutputs
         self.freqs_traininputs = [get_sorted_frequency_situation(x) for x in self.traininputs]
         self.freqs_trainoutputs = [get_sorted_frequency_situation(x) for x in self.trainoutputs]
@@ -77,6 +78,7 @@ class ARCsolver:
 
         # we start predicting dimensions
         self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.cognify_dimensions()
+        self.cur_x_train, self.cur_x_test = self.get_prior_knowledge()
 
     def assess_bg_situation(self):
         traininputs_bg = [x[0][0] for x in self.freqs_traininputs]
@@ -205,3 +207,14 @@ class ARCsolver:
 
     def get_dimension_cognified(self):
         return self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds
+
+    def get_prior_knowledge(self):
+        # First figure out the bg
+        bg_train = self.traininputs_bg
+        bg_test = self.testinputs_bg
+
+        # second gather prior knowledge
+        traininputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_train_preds, self.freqs_traininputs, self.traininputs_bg)]
+        testinputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_test_preds, self.freqs_testinputs, self.testinputs_bg)]
+
+        return traininputs_prkn, testinputs_prkn

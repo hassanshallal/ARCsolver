@@ -1,4 +1,6 @@
-from utils import *
+import numpy as np
+import itertools
+from itertools import permutations, combinations, product
 
 bare_nb_coordinates = lambda i, j: {
     (i+ip, j+jp) for ip, jp in product([1, -1, 0], repeat=2)
