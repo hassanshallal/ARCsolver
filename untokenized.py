@@ -12,9 +12,14 @@ from operator import and_, or_
 from functools import reduce
 from collections import namedtuple
 import random
+import itertools
+from itertools import permutations, combinations, product
 
 from edges import *
 from neighbors import *
+
+# this is a contigious connected color or value based component.
+Component = namedtuple("Component", "lead_val x_start x_stop y_start y_stop x_dim y_dim overall_size num_lead_val_coords num_non_lead_val_coords lead_percent unique_vals unique_vals_counts lead_val_coords lead_val_coords_sign1, lead_val_coords_sign2" )
 
 ## Book-keeping, I/O section
 # This is to serialize the opjects
@@ -102,6 +107,40 @@ def get_testing(raw_task):
         #assert len(traininputs) == len(trainoutputs)
         return testinputs, testoutputs
 
+def plot_task(task, plot_test=False):
+    """
+    Plots the first train and test pairs of a specified task,
+    using same color scheme as the ARC app
+    """
+    cmap = colors.ListedColormap(
+        ['#000000', '#0074D9', '#FF4136', '#2ECC40', '#FFDC00',
+         '#AAAAAA', '#F012BE', '#FF851B', '#7FDBFF', '#870C25'])
+
+    norm = colors.Normalize(vmin=0, vmax=9)
+    train_len = len(task['train'])
+    if plot_test:
+        fig_dim = train_len*2 + 2
+    else:
+        fig_dim = train_len*2
+    fig, axs = plt.subplots(1, fig_dim, figsize=(fig_dim + 10,  fig_dim + 10))
+    for n in range(train_len):
+        axs[2*n].imshow(task['train'][n]['input'], cmap=cmap, norm=norm)
+        axs[2*n].axis('off')
+        axs[2*n].set_title('Train ' + str(n) + ' Input')
+        axs[2*n+1].imshow(task['train'][n]['output'], cmap=cmap, norm=norm)
+        axs[2*n+1].axis('off')
+        axs[2*n+1].set_title('Train ' + str(n) + ' output')
+    if plot_test:
+        axs[train_len*2].imshow(task['test'][0]['input'], cmap=cmap, norm=norm)
+        axs[train_len*2].axis('off')
+        axs[train_len*2].set_title('Test Input')
+        axs[train_len*2 + 1].imshow(task['test'][0]
+                                    ['output'], cmap=cmap, norm=norm)
+        axs[train_len*2 + 1].axis('off')
+        axs[train_len*2 + 1].set_title('Test Output')
+    plt.tight_layout()
+    plt.show()
+
 # plotting a task
 def plot_task_eval(task, testpreds):
     cmap = colors.ListedColormap(
@@ -175,6 +214,9 @@ def list_comparator(l1, l2):
     else:
         return None
 
+def reverse_dict(original):
+    return {v: k for k, v in original.items()}
+
 def list_modulo(l1, l2):
     if len(l1) == len(l2):
         if all([x % y == 0 or y % x == 0 for x, y in zip(l1, l2)]):
@@ -220,7 +262,6 @@ def get_coords_for_vals(in_, bg, global_bg, is_bg_not_component):
 
     if (global_bg or is_bg_not_component) and bg in val_to_coord.keys(): # some cases need global_bg to be True and some don't
         del val_to_coord[bg]
-
     return val_to_coord
 
 def merge_intersecting_pairs(intersecting_pairs_list):
@@ -233,14 +274,12 @@ def merge_intersecting_pairs(intersecting_pairs_list):
 
     return [set(intersecting_pairs_list[i]) for i in range(len(intersecting_pairs_list)) if i not in to_exclude]
 
-Component = namedtuple("Component", "lead_val x_start x_stop y_start y_stop x_dim y_dim overall_size num_lead_val_coords num_non_lead_val_coords lead_percent unique_vals unique_vals_counts lead_val_coords lead_val_coords_sign1, lead_val_coords_sign2" )
-
 def extract_color_continious(in_, bg, global_bg, is_bg_not_component):
-    # this will extract all components based on color contguity
+    # 4 phase connected component routine
+    # Phase-1: extract all components based on color contguity
     val_to_coord = get_coords_for_vals(in_, bg, global_bg, is_bg_not_component)
     singles = set()
     val_to_objects = {}
-
     for k, v in list(val_to_coord.items()):
         nb_results = [neighbor_situation(in_, x[0], x[1]) for x in v]
         check0 = [k in nb_results[x][3].keys() for x in range(len(v))]
@@ -261,7 +300,7 @@ def extract_color_continious(in_, bg, global_bg, is_bg_not_component):
                 val_to_objects[(k, tuple(v[n]))] = [v[n].tolist()]
                 singles.add((k, tuple(v[n])))
 
-    # fix issues related to having no control over the order of testing coordinates
+    # Phase-2: fix issues related to having no control over the order of testing coordinates
     reviewed = {}
     list_of_keys = list(val_to_objects.keys())
     values_of_keys = [x[0] for x in list_of_keys]
@@ -272,7 +311,6 @@ def extract_color_continious(in_, bg, global_bg, is_bg_not_component):
 
         if len(keys_of_q) > 1:
             combs = sorted(list(combinations([x for x in range(len(sets_of_q))], 2)))
-
             combs_intersections = [sets_of_q[x[0]].intersection(sets_of_q[x[1]]) for x in combs]
             comb_intersections_length = [len(x) > 0 for x in combs_intersections]
             found_intersecting_pairs = [combs[i] for i in range(len(combs)) if comb_intersections_length[i]]
@@ -289,19 +327,20 @@ def extract_color_continious(in_, bg, global_bg, is_bg_not_component):
         else:
             reviewed[keys_of_q[0]] = val_to_objects[keys_of_q[0]]
 
-    # get the signatures of your objects, collect these signatures and label them or not
+    # Phase-3: get the signatures of your objects, collect these signatures and label them or not
     vals_to_object_signature1 = {}
     vals_to_object_signature2 = {}
     for k, v in list(reviewed.items()):
         if len(v) > 1:
             vals_to_object_signature1[k] = [neighbor_situation(in_, x[0], x[1])[3][k[0]] for x in v]
             vals_to_object_signature2[k] = [neighbor_situation(in_, x[0], x[1])[1][k[0]] for x in v]
-    # configure objects, must be done:
+
+    # Phase-4: convert into formalized components, call it trimmed objects
     trimmed_objects = []
     #print('reviewed:', reviewed)
     for k, v in reviewed.items():
         v = list(v)
-        v.sort(key = lambda x:(x[0], x[1]))
+        v.sort(key = lambda x:(x[0], x[1])) # very critical
         x_start = min([x[0] for x in v])
         x_stop = max([x[0] for x in v]) + 1
         y_start = min([x[1] for x in v])
@@ -584,7 +623,7 @@ def get_x_y_situation(in_):
 
     return x_situation, y_situation
 
-def get_frequency_situation(in_, freqs_traininput):
+def get_frequency_situation_adv(in_, freqs_traininput):
     sorting_dict = {}
     for x in range(len(freqs_traininput[0])):
         sorting_dict[freqs_traininput[0][x]] = x
@@ -598,9 +637,9 @@ def get_frequency_situation(in_, freqs_traininput):
         i -= 1
     return apply_transform_map(in_, sorting_dict), apply_transform_map(in_, reverse_sorting_dict)
 
-def build_prior_knowledge(in_, freqs_traininput, traininput_bg):
+def build_prior_knowledge_adv(in_, freqs_traininput, traininput_bg):
     x_situation, y_situation = get_x_y_situation(in_)
-    most_freq_lead_frequency_graph, least_freq_lead_frequency_graph = get_frequency_situation(in_, freqs_traininput) # get_frequency_situation gives two sorted and reverse sorted graphs to cover for the 2nd largest or the thisd smallest
+    most_freq_lead_frequency_graph, least_freq_lead_frequency_graph = get_frequency_situation_adv(in_, freqs_traininput) # get_frequency_situation_adv gives two sorted and reverse sorted graphs to cover for the 2nd largest or the thisd smallest
     edge_situation = get_edge_situation(in_, traininput_bg)
 
     num_neighbors, nb_space_situation, most_common_neighbor, least_common_neighbor = neighbor_situation_whole(in_)
@@ -620,3 +659,63 @@ def build_prior_knowledge(in_, freqs_traininput, traininput_bg):
 
 
     return np.stack((in_, x_situation, y_situation, most_freq_lead_frequency_graph, least_freq_lead_frequency_graph, edge_situation, num_neighbors, nb_space_situation, most_common_neighbor, least_common_neighbor, comb7), axis = 0) # , comb0, comb1, comb2, comb3, comb4, comb5
+
+def get_value_graphs(in_, out_):
+    if in_.shape == out_.shape:
+        overall_list = list(itertools.chain.from_iterable(np.dstack((in_, out_)).tolist()))
+        overall_list = [tuple(x) for x in overall_list]
+        overall_set = set(overall_list)
+        return overall_set
+    else:
+        in_unique = set(np.unique(in_).tolist())
+        out_unique = set(np.unique(out_).tolist())
+
+        in_vanishes = in_unique - out_unique
+        out_appears  = out_unique - in_unique
+        stays = in_unique.intersection(out_unique)
+
+        final = set()
+        for n in in_vanishes:
+            final.add((n, -1))
+        for n in out_appears:
+            final.add((-1, n))
+        for n in stays:
+            final.add((n, n))
+        return final
+
+def get_freq_dict_in_(in_freqs, in_bg):
+    freq_dict = {}
+    freq_dict[-1] = 'nil'
+    if in_bg in in_freqs:
+        bg_in = in_freqs.index(in_bg)
+        if bg_in != 0:
+            temp = in_freqs[0]
+            in_freqs[0] = in_bg
+            in_freqs[bg_in] = temp
+    else:
+        freq_dict[in_bg] = 'c'
+
+
+    for n in range(len(in_freqs)):
+        freq_dict[in_freqs[n]] = 'c' + str(n)
+
+
+    return freq_dict
+
+def get_freq_dict_out_(out_freqs, in_tokenized):
+    in_tokenized_reversed = reverse_dict(in_tokenized)
+    freq_dict = {}
+    freq_dict[-1] = 'nil'
+    priors = 0
+    for n in range(len(out_freqs)):
+        if out_freqs[n] in in_tokenized.keys():
+            freq_dict[out_freqs[n]] = in_tokenized[out_freqs[n]]
+        else:
+            freq_dict[out_freqs[n]] = 'o' + str(priors)
+            priors += 1
+
+    return freq_dict
+
+def tokenize_transformation_graph(transformation_graph_list, in_col_to_token, out_col_to_token):
+    tokenized_list = [[in_col_to_token[x[0]], out_col_to_token[x[1]]] for x in transformation_graph_list]
+    return tokenized_list

@@ -9,11 +9,11 @@ from edges import *
 from neighbors import *
 
 class Inductive(TaskManager):
-    def __init__(self, raw_task):
-        super().__init__(raw_task)
+    def __init__(self, raw_task, forced_bg = None):
+        super().__init__(raw_task, forced_bg = None)
 
         # It is obvious we work on dimensions first
-        self.fragmented_core_knowledge = Fragmented(self.cur_train_preds, self.trainoutputs, self.cur_test_preds, self.traininputs_bg, self.testoutputs)
+        self.fragmented_core_knowledge = Fragmented(self.cur_train_preds, self.trainoutputs, self.cur_test_preds, self.bg, self.testoutputs)
         self.ARCsolver = ARCsolver(raw_task)
         self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.ARCsolver.get_dimension_cognified()
         if self.dimension_status != 'deduced':
@@ -46,8 +46,12 @@ class Inductive(TaskManager):
 
     def get_prior_knowledge(self):
         # First figure out the bg
-        bg_train = self.traininputs_bg
-        bg_test = self.testinputs_bg
+        if self.global_bg:
+            bg_train = [self.bg] * self.num_train
+            bg_test = [self.bg] * self.num_test
+        else:
+            bg_train = self.bg
+            bg_test = [get_background(x) for x in self.testinputs]
 
         # second gather prior knowledge
         traininputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_train_preds, bg_train, self.color_to_tokens)]
@@ -168,7 +172,7 @@ class Inductive(TaskManager):
                 routines = [pass_info['routine']] * len(self.traininputs)
                 train_situation = [x[0](y, x[1]) for x, y in zip(routines, train_situation)]
         elif what_to_try == 'apply_scenarios':
-            pass_info = {'is_unique_train_outputs': self.fragmented_core_knowledge.is_unique_train_outputs, 'bg_in_unique_train_outputs': self.fragmented_core_knowledge.bg_in_unique_train_outputs, 'bg': self.traininputs_bg}
+            pass_info = {'is_unique_train_outputs': self.fragmented_core_knowledge.is_unique_train_outputs, 'bg_in_unique_train_outputs': self.fragmented_core_knowledge.bg_in_unique_train_outputs, 'bg': self.bg}
             train_situation = [apply_routine(self.pr_kn_apply_scenarios, x, y, z, pass_info) for x, y, z in zip(self.cur_x_train, self.token_to_colors, self.train_output_dim_preds)]
     # apply_scenarios(pr_knowledge_input, pr_kn_apply_scenarios, token_to_color)
         train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
@@ -184,7 +188,7 @@ class Inductive(TaskManager):
                     routines = [pass_info['routine']] * len(self.testinputs)
                     test_situation = [x[0](y, x[1]) for x, y in zip(routines, test_situation)]
             elif what_to_try == 'apply_scenarios':
-                pass_info = {'is_unique_train_outputs': self.fragmented_core_knowledge.is_unique_train_outputs, 'bg_in_unique_train_outputs': self.fragmented_core_knowledge.bg_in_unique_train_outputs, 'bg': self.testinputs_bg}
+                pass_info = {'is_unique_train_outputs': self.fragmented_core_knowledge.is_unique_train_outputs, 'bg_in_unique_train_outputs': self.fragmented_core_knowledge.bg_in_unique_train_outputs, 'bg': self.bg}
                 test_situation = [apply_routine(self.pr_kn_apply_scenarios, x, y, z, pass_info) for x, y, z in zip(self.cur_x_test, self.test_token_to_colors, self.test_output_dim_preds)]
 
             if len(self.testoutputs) > 0:

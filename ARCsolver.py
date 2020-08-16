@@ -9,7 +9,7 @@ class ARCsolver:
         self.traininputs, self.trainoutputs = get_training(raw_task)
         self.testinputs, self.testoutputs = get_testing(raw_task) # For tasks where there is no output, testoutputs is an empty list
         self.cur_train_preds, self.cur_test_preds = deepcopy(self.traininputs), deepcopy(self.testinputs)
-        
+
         # prepare relevant info for your tests conditionally on presence of testoutputs
         self.freqs_traininputs = [get_sorted_frequency_situation(x) for x in self.traininputs]
         self.freqs_trainoutputs = [get_sorted_frequency_situation(x) for x in self.trainoutputs]
@@ -23,6 +23,11 @@ class ARCsolver:
         self.traininputs_shapes = [list(x.shape) for x in self.traininputs]
         self.trainoutputs_shapes = [list(x.shape) for x in self.trainoutputs]
         self.testinputs_shapes = [list(x.shape) for x in self.testinputs]
+        # we have the main traget is the testoutput, dimesnion and frequency of test components are subtargets
+        if len(self.testoutputs) > 0:
+            self.testoutputs_shapes = [list(x.shape) for x in self.testoutputs]
+        else:
+            self.testoutputs_shapes = []
 
         # overaall num of cells
         self.num_cells_traininputs = [x[0] * x[1] for x in self.traininputs_shapes]
@@ -34,24 +39,6 @@ class ARCsolver:
         self.int_div = [get_int_div(x, y) for x, y in zip(self.traininputs_shapes, self.trainoutputs_shapes)]
         self.is_sim_int_div = all([x == self.int_div[0] for x in self.int_div])
         self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.int_div])
-
-        self.traininput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.traininputs, self.traininputs_bg)])
-        self.testinput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.testinputs, self.testinputs_bg)])
-        self.trainoutput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.trainoutputs, self.trainoutputs_bg)])
-
-        self.traininput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.traininput_objects)]
-        self.testinput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.testinput_objects)]
-        self.trainoutput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.trainoutput_objects)]
-
-        self.traininput_objects_dims = get_dims_objects(self.traininput_objects)
-        self.testinput_objects_dims = get_dims_objects(self.testinput_objects)
-
-        self.trainoutput_dims_in_traininputs_objects = all([x in y for x, y in zip(self.trainoutputs_shapes, self.traininput_objects_dims)])
-
-        self.is_one_object_in_input = all([len(x) == 1 for x in self.traininput_objects])
-        self.is_one_object_in_output = all([len(x) == 1 for x in self.trainoutput_objects])
-        self.one_object_situation = self.is_one_object_in_input and self.is_one_object_in_output
-        self.multiple_object_situation = not self.is_one_object_in_input and self.is_one_object_in_output
 
         self.what_relation = [list_comparator(x, y) for x, y in zip(self.traininputs_shapes, self.trainoutputs_shapes)]
         self.out_in_rel = [convolve_for_a_match(x, y, z) for x, y, z in zip(self.traininputs, self.trainoutputs, self.what_relation)]
@@ -67,14 +54,48 @@ class ARCsolver:
         self.is_one_row = any([x == 1 for x in self.row_dim_ouputs])
         self.is_one_col = any([x == 1 for x in self.col_dim_ouputs])
         self.is_one_row_or_column = self.is_one_row or self.is_one_col
-        #all([(x[0] == 1 or x[1] == 1) and ((x[0] == 1) != (x[1] == 1)) for x in self.trainoutputs_shapes])
 
-        # we have the main traget is the testoutput, dimesnion and frequency of test components are subtargets
-        if len(self.testoutputs) > 0:
-            self.freqs_testoutputs = [get_sorted_frequency_situation(x) for x in self.testoutputs]
-            self.testoutputs_shapes = [list(x.shape) for x in self.testoutputs]
-        else:
-            self.freqs_testoutputs, self.testoutputs_shapes = [], []
+        # objectness
+        self.traininput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.traininputs, self.traininputs_bg)])
+        self.testinput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.testinputs, self.testinputs_bg)])
+        self.trainoutput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.trainoutputs, self.trainoutputs_bg)])
+
+        self.traininput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.traininput_objects)]
+        self.testinput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.testinput_objects)]
+        self.trainoutput_spatial_objects = [extract_spatial_continious(x) for x in deepcopy(self.trainoutput_objects)]
+
+        self.traininput_objects_dims = get_dims_objects(self.traininput_objects)
+        self.testinput_objects_dims = get_dims_objects(self.testinput_objects)
+
+        self.trainoutput_dims_in_traininputs_objects = all([x in y for x, y in zip(self.trainoutputs_shapes, self.traininput_objects_dims)])
+
+        # tokenize, collect transformation and tokenized_transformation graphs
+        self.col_to_token_inputs = [get_freq_dict_in_(x[0], y) for x, y in zip(self.freqs_traininputs, self.traininputs_bg)]
+        self.col_to_token_outputs = [get_freq_dict_out_(x[0], y) for x, y in zip(self.freqs_trainoutputs, self.col_to_token_inputs)]
+
+        self.token_to_col_inputs = [reverse_dict(x) for x in self.col_to_token_inputs]
+        self.token_to_col_outputs = [reverse_dict(x) for x in self.col_to_token_outputs]
+
+        self.token_to_col_inputs_keys = [sorted(list(x.keys())) for x in self.token_to_col_inputs]
+        self.token_to_col_outputs_keys = [sorted(list(x.keys())) for x in self.token_to_col_outputs]
+
+        self.token_to_col_inputs_keys_length = [len(x) for x in self.token_to_col_inputs_keys]
+        self.token_to_col_outputs_keys_length = [len(x) for x in self.token_to_col_outputs_keys]
+
+        self.max_input_dict_ind = self.token_to_col_inputs_keys_length.index(max(self.token_to_col_inputs_keys_length))
+        self.max_output_dict_ind = self.token_to_col_outputs_keys_length.index(max(self.token_to_col_outputs_keys_length))
+
+        self.same_input_tokens = all([sorted(list(x.keys())) == sorted(list(self.token_to_col_inputs[0].keys())) for x in self.token_to_col_inputs])
+        self.same_output_tokens = all([sorted(list(x.keys())) == sorted(list(self.token_to_col_outputs[0].keys())) for x in self.token_to_col_outputs])
+        self.obd_input = all([set(x).issubset(set(self.token_to_col_inputs_keys[self.max_input_dict_ind])) for x in self.token_to_col_inputs_keys])
+        self.obd_output = all([set(x).issubset(set(self.token_to_col_outputs_keys[self.max_output_dict_ind])) for x in self.token_to_col_outputs_keys])
+        self.obd_input_len = all([len(x) == len(self.token_to_col_inputs_keys[0]) for x in self.token_to_col_inputs_keys])
+        self.obd_output_len = all([len(x) == len(self.token_to_col_outputs_keys[0]) for x in self.token_to_col_outputs_keys])
+
+        self.transformation_graph_list = [sorted(list(get_value_graphs(x,y))) for x, y in zip(self.traininputs, self.trainoutputs)]
+        self.tokenized_transformation_graph_list = [tokenize_transformation_graph(x, y, z) for x, y, z in zip(self.transformation_graph_list, self.col_to_token_inputs, self.col_to_token_outputs)]
+
+        # We need to get token_to_col and col_to_token for test_input
 
         # we start predicting dimensions
         self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.cognify_dimensions()
@@ -205,16 +226,16 @@ class ARCsolver:
 
         return 'undeduced', [], []
 
-    def get_dimension_cognified(self):
-        return self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds
-
     def get_prior_knowledge(self):
         # First figure out the bg
         bg_train = self.traininputs_bg
         bg_test = self.testinputs_bg
 
         # second gather prior knowledge
-        traininputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_train_preds, self.freqs_traininputs, self.traininputs_bg)]
-        testinputs_prkn = [build_prior_knowledge(x, y, z) for x, y, z in zip(self.cur_test_preds, self.freqs_testinputs, self.testinputs_bg)]
+        traininputs_prkn = [build_prior_knowledge_adv(x, y, z) for x, y, z in zip(self.cur_train_preds, self.freqs_traininputs, self.traininputs_bg)]
+        testinputs_prkn = [build_prior_knowledge_adv(x, y, z) for x, y, z in zip(self.cur_test_preds, self.freqs_testinputs, self.testinputs_bg)]
 
         return traininputs_prkn, testinputs_prkn
+
+    def get_dimension_cognified(self):
+        return self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds
