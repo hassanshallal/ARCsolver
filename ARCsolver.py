@@ -3,12 +3,28 @@ from untokenized import *
 class ARCsolver:
 
     def __init__(self, raw_task):
+        self.solved, self.mechanisms = 'unsolved', []
+        self.current_situation, self.train_situation, self.train_screen, self.test_situation, self.test_screen = 'ineligible', [], [], [], []
+        self.applied_checkpoint_results = {}
+
         self.raw_task = raw_task
         self.num_train = len(raw_task['train'])
         self.num_test = len(raw_task['test'])
         self.traininputs, self.trainoutputs = get_training(raw_task)
         self.testinputs, self.testoutputs = get_testing(raw_task) # For tasks where there is no output, testoutputs is an empty list
         self.cur_train_preds, self.cur_test_preds = deepcopy(self.traininputs), deepcopy(self.testinputs)
+
+        # check and apply for flips, here, you have all you need to do so.
+        checkpoint0 = self.checkpoint(self.check_flips(self.cur_train_preds, self.trainoutputs))
+        if checkpoint0 == 'halt':
+            return
+
+        # we get transformation_graph_list
+        self.transformation_graph_list = [sorted(list(get_value_graphs(x,y))) for x, y in zip(self.traininputs, self.trainoutputs)]
+
+        checkpoint1 = self.checkpoint(self.check_transforms(self.transformation_graph_list))
+        if checkpoint1 == 'halt':
+            return
 
         # prepare relevant info for your tests conditionally on presence of testoutputs
         self.freqs_traininputs = [get_sorted_frequency_situation(x) for x in self.traininputs]
@@ -41,8 +57,6 @@ class ARCsolver:
         self.is_sim_internal_int_div = all([x[0] == x[1] for x in self.int_div])
 
         self.what_relation = [list_comparator(x, y) for x, y in zip(self.traininputs_shapes, self.trainoutputs_shapes)]
-        self.out_in_rel = [convolve_for_a_match(x, y, z) for x, y, z in zip(self.traininputs, self.trainoutputs, self.what_relation)]
-        self.is_out_in_rel = all([x[0] for x in self.out_in_rel])
 
         # logical Factors
         self.unique_train_outputs = [np.unique(x).tolist() for x in self.trainoutputs]
@@ -69,9 +83,24 @@ class ARCsolver:
 
         self.trainoutput_dims_in_traininputs_objects = all([x in y for x, y in zip(self.trainoutputs_shapes, self.traininput_objects_dims)])
 
-        # tokenize, collect transformation and tokenized_transformation graphs
+        # we start predicting dimensions
+        self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.cognify_dimensions()
+
+        if self.dimension_status != 'deduced':
+            return
+
+        checkpoint2 = self.checkpoint(self.check_expansions_contractions())
+        if checkpoint2 == 'halt':
+            return
+
+
+        # tokenize, collect transformation and tokenized_transformation graphs (there are decisions made on the fly here)
         self.col_to_token_inputs = [get_freq_dict_in_(x[0], y) for x, y in zip(self.freqs_traininputs, self.traininputs_bg)]
+        self.col_to_token_testinputs = [get_freq_dict_in_(x[0], y) for x, y in zip(self.freqs_testinputs, self.testinputs_bg)]
+        self.col_to_token_inputs, self.col_to_token_testinputs= self.massage_input_dicts()
         self.col_to_token_outputs = [get_freq_dict_out_(x[0], y) for x, y in zip(self.freqs_trainoutputs, self.col_to_token_inputs)]
+        self.col_to_token_inputs = [supplement_dict(x, y) for x, y in zip(self.col_to_token_inputs, self.col_to_token_outputs)]
+
 
         self.token_to_col_inputs = [reverse_dict(x) for x in self.col_to_token_inputs]
         self.token_to_col_outputs = [reverse_dict(x) for x in self.col_to_token_outputs]
@@ -84,6 +113,8 @@ class ARCsolver:
 
         self.max_input_dict_ind = self.token_to_col_inputs_keys_length.index(max(self.token_to_col_inputs_keys_length))
         self.max_output_dict_ind = self.token_to_col_outputs_keys_length.index(max(self.token_to_col_outputs_keys_length))
+        self.col_to_token_testinputs = [supplement_dict(x, y) for x, y in zip(self.col_to_token_testinputs, [self.col_to_token_outputs[self.max_output_dict_ind]] * self.num_test)]
+        self.token_to_col_testinputs = [reverse_dict(x) for x in self.col_to_token_testinputs]
 
         self.same_input_tokens = all([sorted(list(x.keys())) == sorted(list(self.token_to_col_inputs[0].keys())) for x in self.token_to_col_inputs])
         self.same_output_tokens = all([sorted(list(x.keys())) == sorted(list(self.token_to_col_outputs[0].keys())) for x in self.token_to_col_outputs])
@@ -92,13 +123,12 @@ class ARCsolver:
         self.obd_input_len = all([len(x) == len(self.token_to_col_inputs_keys[0]) for x in self.token_to_col_inputs_keys])
         self.obd_output_len = all([len(x) == len(self.token_to_col_outputs_keys[0]) for x in self.token_to_col_outputs_keys])
 
-        self.transformation_graph_list = [sorted(list(get_value_graphs(x,y))) for x, y in zip(self.traininputs, self.trainoutputs)]
-        self.tokenized_transformation_graph_list = [tokenize_transformation_graph(x, y, z) for x, y, z in zip(self.transformation_graph_list, self.col_to_token_inputs, self.col_to_token_outputs)]
+        self.tokenized_transformation_graph_list = [sorted(tokenize_transformation_graph(x, y, z)) for x, y, z in zip(self.transformation_graph_list, self.col_to_token_inputs, self.col_to_token_outputs)]
+        checkpoint3 = self.checkpoint(self.check_transforms(self.tokenized_transformation_graph_list))
+        if checkpoint3 == 'halt':
+            return
 
         # We need to get token_to_col and col_to_token for test_input
-
-        # we start predicting dimensions
-        self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds = self.cognify_dimensions()
         self.cur_x_train, self.cur_x_test = self.get_prior_knowledge()
 
     def assess_bg_situation(self):
@@ -226,16 +256,159 @@ class ARCsolver:
 
         return 'undeduced', [], []
 
+    def get_dimension_cognified(self):
+        return self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds
+
+    def massage_input_dicts(self):
+        original = deepcopy(self.col_to_token_inputs + self.col_to_token_testinputs)
+        common = set.intersection(*[set(x.keys()) for x in original])
+        common_list = sorted(list(common))
+        modified_dicts = []
+        for original_dict in original:
+            new_dict = {}
+            extra_keys = set(original_dict.keys()) - common
+            start = 0
+            for n in common_list:
+                if n == -1:
+                    new_dict[n] = 'nil'
+                else:
+                    new_dict[n] = 'c' + str(start)
+                    start += 1
+
+            for n in extra_keys:
+                if original_dict[n] not in new_dict.values():
+                    new_dict[n] = original_dict[n]
+                else:
+                    new_dict[n] = 'c' + str(start)
+
+            modified_dicts.append(new_dict)
+
+        return modified_dicts[0:len(self.col_to_token_inputs)], modified_dicts[len(self.col_to_token_inputs):]
+
     def get_prior_knowledge(self):
         # First figure out the bg
         bg_train = self.traininputs_bg
         bg_test = self.testinputs_bg
 
         # second gather prior knowledge
-        traininputs_prkn = [build_prior_knowledge_adv(x, y, z) for x, y, z in zip(self.cur_train_preds, self.freqs_traininputs, self.traininputs_bg)]
-        testinputs_prkn = [build_prior_knowledge_adv(x, y, z) for x, y, z in zip(self.cur_test_preds, self.freqs_testinputs, self.testinputs_bg)]
+        traininputs_prkn = [build_prior_knowledge_adv(w, x, y, z) for w, x, y, z in zip(self.cur_train_preds, self.col_to_token_inputs, self.freqs_traininputs, self.traininputs_bg)]
+        testinputs_prkn = [build_prior_knowledge_adv(w, x, y, z) for w, x, y, z in zip(self.cur_test_preds, self.col_to_token_testinputs, self.freqs_testinputs, self.testinputs_bg)]
 
         return traininputs_prkn, testinputs_prkn
 
-    def get_dimension_cognified(self):
-        return self.dimension_status, self.train_output_dim_preds, self.test_output_dim_preds
+    def checkpoint(self, what_to_check):
+        # check and apply for flips, here, you have all you need to do so.
+        # print('a')
+        to_try, what_to_try, pass_info = what_to_check
+        #print(to_try, what_to_try, pass_info)
+        if to_try:
+            # print('c')
+            current_situation, train_situation, train_screen, test_situation, test_screen = self.try_apply_routines(what_to_try, pass_info)
+            self.applied_checkpoint_results[str(what_to_check)] = (current_situation, train_situation, train_screen, test_situation, test_screen)
+
+            # print(current_situation)
+            if current_situation == 'passed_all_testinputs':
+                # print('d')
+                self.solved = 'solved'
+                self.mechanisms.append((what_to_try, pass_info))
+                self.current_situation, self.train_situation, self.train_screen, self.test_situation, self.test_screen =  current_situation, train_situation, train_screen, test_situation, test_screen
+                return 'halt'
+            return 'continue'
+        return  'continue'
+
+    def try_apply_routines(self, apply_routine, pass_info): # apply routine must work on in_ and pass_info
+        # print('e')
+        # print('apply_routine:', apply_routine)
+        # print('pass_info:', pass_info)
+        current_situation = 'screening ' + str(apply_routine)
+        train_situation = deepcopy(self.cur_train_preds)
+        train_options = [(None, None)] * len(train_situation)
+        train_screen = [False] * len(train_situation)
+        test_situation = deepcopy(self.cur_test_preds)
+        test_screen = ['nil'] * len(test_situation) # we always assume we don't have testoutputs and hence we can't compare
+
+        # assess train_situation
+        if apply_routine == self.apply_simple_tokenized_transforms:
+            train_situation = [apply_routine(x, y, pass_info, z) for x, y, z in zip(train_situation, self.col_to_token_inputs, self.token_to_col_inputs)]
+        else:
+            train_situation = [apply_routine(x, pass_info) for x in train_situation]
+
+        train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
+        # print('f')
+        if all(train_screen):
+            current_situation = 'passed_all_traininputs'
+            if apply_routine == self.apply_simple_tokenized_transforms:
+                test_situation = [apply_routine(x, y, pass_info, z) for x, y, z in zip(test_situation, self.col_to_token_testinputs, self.token_to_col_testinputs)]
+            else:
+                test_situation = [apply_routine(x, pass_info) for x in test_situation]
+
+            if len(self.testoutputs) > 0:
+                test_screen = [np.array_equal(x, y) for x, y in zip(test_situation, self.testoutputs)]
+                if all(test_screen):
+                    current_situation = 'passed_all_testinputs'
+                elif all(test_screen) == False and any(test_screen):
+                    current_situation = 'passed_some_testinputs'
+                else:
+                    current_situation = 'unpassed_all_testinputs'
+        elif all(train_screen) == False and any(train_screen):
+            current_situation = 'passed_some_traininputs'
+
+        else:
+            current_situation = 'unpassed_all_traininputs'
+
+        return current_situation, train_situation, train_screen, test_situation, test_screen
+
+    def check_flips(self, cur_train_preds, trainoutput):
+        to_pass = {}
+        x, y = screen_flips_rotation(cur_train_preds[0], trainoutput[0])
+        train_options = [screen_flips_rotation(x, y) for x, y in zip(cur_train_preds, trainoutput)]
+        if all([x != (None, None) and x == train_options[0] for x in train_options]):
+            to_pass['routine'] = train_options[0]
+            return True, self.apply_flips, to_pass
+        else:
+            return False, '', to_pass
+
+    def apply_flips(self, in_, pass_info, **kawrgs):
+        if pass_info['routine'][1] == None:
+            return pass_info['routine'][0](in_)
+        elif pass_info['routine'][1] != None:
+            return pass_info['routine'][0](in_, pass_info['routine'][1])
+
+    def check_transforms(self, transformation_graph_list):
+        to_pass = {}
+        set_of_col_changes = set.union(*[set(x) for x in transformation_graph_list])
+        if len(set([x[0] for x in set_of_col_changes])) == len(set_of_col_changes):
+            for transform in set_of_col_changes:
+                to_pass[transform[0]] = transform[1]
+
+            if type(list(to_pass.keys())[0]) == int:
+                return True, self.apply_simple_transforms, to_pass
+            elif type(list(to_pass.keys())[0]) == str:
+                return True, self.apply_simple_tokenized_transforms, to_pass
+        else:
+            return False, '', to_pass
+
+    def apply_simple_transforms(self, in_, pass_info):
+        return apply_transform_map(in_, pass_info)
+
+    def apply_simple_tokenized_transforms(self, in_, col_to_token, pass_info, token_to_col):
+        a = apply_transform_map(in_, col_to_token)
+        b = apply_transform_map(a, pass_info)
+        return apply_transform_map(b, token_to_col)
+
+    def check_expansions_contractions(self, start = self.traininputs):
+        to_pass = {}
+        out_in_rel = [convolve_for_a_match(x, y, z) for x, y, z in zip(start, self.trainoutputs, self.what_relation)]
+        is_out_in_rel = all([x[0] for x in out_in_rel])
+        is_same = all([x[2] == out_in_rel[0][2] for x in out_in_rel])
+        if is_out_in_rel and is_same or self.is_unique_train_outputs:
+            to_pass['scenario'] = out_in_rel[0][2]
+            to_pass['arrangements'] = [[j[0] for j in i[1]] for i in out_in_rel]
+            to_pass['starts'] = [[j[1] for j in i[1]] for i in out_in_rel]
+            to_pass['is_unique_train_outputs'] = self.is_unique_train_outputs =
+            return True, self.apply_expansions_contractions, to_pass
+        return False, '', to_pass
+
+    def apply_expansions_contractions(self, in_, pass_info):
+
+        pass

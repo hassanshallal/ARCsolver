@@ -461,6 +461,29 @@ def get_flips_rotation(in_):
     flipped_lr = np.fliplr(in_)
     return [in_, diagonal_mirror, offdiagonal_mirror, rotated90_1, rotated90_2, rotated90_3, flipped_ud, flipped_lr]
 
+# There may be some redundancie in the screen_flips_rotation function, no time to gather test cases
+def screen_flips_rotation(in_, out_):
+    in_ = fix_dim(in_)
+    out_ = fix_dim(out_)
+
+    # get_diagonal_mirror is more precedent than rotation which is more precedent over flipud or fliplr
+    if np.all(get_diagonal_mirror(in_) == out_):
+        return get_diagonal_mirror, None
+    elif np.all(get_offdiagonal_mirror(in_) == out_):
+        return get_offdiagonal_mirror, None
+    elif np.all(np.rot90(in_, 1, axes = (0, 1)) == out_):
+        return np.rot90, 1
+    elif np.all(np.rot90(in_, 2, axes = (0, 1)) == out_):
+        return np.rot90, 2
+    elif np.all(np.rot90(in_, 3, axes = (0, 1)) == out_):
+        return np.rot90, 3
+    elif np.all(np.flipud(in_) == out_):
+        return np.flipud, None
+    elif np.all(np.fliplr(in_) == np.array(out_)):
+        return np.fliplr, None
+    else:
+        return None, None
+
 def convolve_for_a_match(in_, out_, rel):
     #  in_ = np.where(in_ != bg, 1, 0)
     #  out_ = np.where(out_ != bg, 1, 0)
@@ -637,7 +660,9 @@ def get_frequency_situation_adv(in_, freqs_traininput):
         i -= 1
     return apply_transform_map(in_, sorting_dict), apply_transform_map(in_, reverse_sorting_dict)
 
-def build_prior_knowledge_adv(in_, freqs_traininput, traininput_bg):
+def build_prior_knowledge_adv(in_, col_to_token, freqs_traininput, traininput_bg):
+
+    tokenized_graph = apply_transform_map(in_, col_to_token)
     x_situation, y_situation = get_x_y_situation(in_)
     most_freq_lead_frequency_graph, least_freq_lead_frequency_graph = get_frequency_situation_adv(in_, freqs_traininput) # get_frequency_situation_adv gives two sorted and reverse sorted graphs to cover for the 2nd largest or the thisd smallest
     edge_situation = get_edge_situation(in_, traininput_bg)
@@ -657,8 +682,7 @@ def build_prior_knowledge_adv(in_, freqs_traininput, traininput_bg):
 
     comb8 = num_neighbors * nb_space_situation
 
-
-    return np.stack((in_, x_situation, y_situation, most_freq_lead_frequency_graph, least_freq_lead_frequency_graph, edge_situation, num_neighbors, nb_space_situation, most_common_neighbor, least_common_neighbor, comb7), axis = 0) # , comb0, comb1, comb2, comb3, comb4, comb5
+    return np.stack((in_, tokenized_graph, x_situation, y_situation, most_freq_lead_frequency_graph, least_freq_lead_frequency_graph, edge_situation, num_neighbors, nb_space_situation, most_common_neighbor, least_common_neighbor, comb7), axis = 0) # , comb0, comb1, comb2, comb3, comb4, comb5
 
 def get_value_graphs(in_, out_):
     if in_.shape == out_.shape:
@@ -717,5 +741,12 @@ def get_freq_dict_out_(out_freqs, in_tokenized):
     return freq_dict
 
 def tokenize_transformation_graph(transformation_graph_list, in_col_to_token, out_col_to_token):
-    tokenized_list = [[in_col_to_token[x[0]], out_col_to_token[x[1]]] for x in transformation_graph_list]
+    tokenized_list = [(in_col_to_token[x[0]], out_col_to_token[x[1]]) for x in transformation_graph_list]
     return tokenized_list
+
+def supplement_dict(a, b):
+    extra = set(b.keys()) - set(a.keys())
+    for n in extra:
+        if b[n] not in a.values():
+            a[n] = b[n]
+    return a

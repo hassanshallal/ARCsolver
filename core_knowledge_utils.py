@@ -52,6 +52,16 @@ def check_flips(cur_train_preds, trainoutput):
     else:
         return False, '', to_pass
 
+def apply_flips(in_, pass_info):
+    if pass_info['routine'][1] == None:
+        return pass_info['routine'][0](in_)
+    elif pass_info['routine'][1] != None:
+        return pass_info['routine'][0](in_, pass_info['routine'][1])
+
+
+
+
+
 def check_scenarios(pr_kn_apply_scenarios):
     if pr_kn_apply_scenarios != None:
         return True, 'apply_scenarios', {}
