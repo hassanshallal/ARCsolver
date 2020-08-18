@@ -65,9 +65,9 @@ class ARCsolver:
 
         self.row_dim_ouputs = [x[0] for x in self.trainoutputs_shapes]
         self.col_dim_ouputs = [x[1] for x in self.trainoutputs_shapes]
-        self.is_one_row = any([x == 1 for x in self.row_dim_ouputs])
-        self.is_one_col = any([x == 1 for x in self.col_dim_ouputs])
-        self.is_one_row_or_column = self.is_one_row or self.is_one_col
+        self.is_one_row = all([x == 1 for x in self.row_dim_ouputs])
+        self.is_one_col = all([x == 1 for x in self.col_dim_ouputs])
+        self.is_one_row_or_column = any([x == 1 for x in self.row_dim_ouputs]) or any([x == 1 for x in self.col_dim_ouputs])
 
         # objectness
         self.traininput_objects = sort_objects_dims([extract_color_continious(x, y, self.global_bg, self.is_bg_not_component) for x, y in zip(self.traininputs, self.traininputs_bg)])
@@ -89,7 +89,7 @@ class ARCsolver:
         if self.dimension_status != 'deduced':
             return
 
-        checkpoint2 = self.checkpoint(self.check_expansions_contractions())
+        checkpoint2 = self.checkpoint(self.check_expansions_contractions(self.traininputs))
         if checkpoint2 == 'halt':
             return
 
@@ -207,7 +207,59 @@ class ARCsolver:
             train_dim_preds = modify_dimensiosn(self.traininputs_shapes, self.int_div[0])
             test_dim_preds = modify_dimensiosn(self.testinputs_shapes, self.int_div[0])
             if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
-                return 'deduced',  train_dim_preds, test_dim_preds # 7
+                return 'deduced',  train_dim_preds, test_dim_preds
+        if self.is_sim_internal_int_div:
+            factors = [int(x[0]) for x in self.int_div]
+            nonbg_number_train = [len(x[0]) - 1 for x in self.freqs_traininputs]
+            if factors == nonbg_number_train:
+                nonbg_number_test = [len(x[0]) - 1 for x in self.freqs_testinputs]
+                train_dim_preds = [[x*y[0], x*y[1]] for x, y in zip(nonbg_number_train, self.traininputs_shapes)]
+                test_dim_preds = [[x*y[0], x*y[1]] for x, y in zip(nonbg_number_test, self.testinputs_shapes)]
+                if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
+                    return 'deduced',  train_dim_preds, test_dim_preds
+
+            match_frequency = all([x in y[1] for x, y in zip(factors, self.freqs_traininputs)])
+            if match_frequency:
+                indices = [y[1].index(x) for x, y in zip(factors, self.freqs_traininputs)]
+                if all([x == indices[0] for x in indices]):
+                    train_dim_preds = [[x[1][indices[0]]*y[0], x[1][indices[0]]*y[1]] for x, y in zip(self.freqs_traininputs, self.traininputs_shapes)]
+                    test_dim_preds = [[x[1][indices[0]]*y[0], x[1][indices[0]]*y[1]] for x, y in zip(self.freqs_testinputs, self.testinputs_shapes)]
+                    if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
+                        return 'deduced',  train_dim_preds, test_dim_preds
+
+        if self.is_one_row:
+            nonbg_number_train = [len(x[0]) - 1 for x in self.freqs_traininputs]
+            if self.col_dim_ouputs == nonbg_number_train:
+                train_dim_preds = [[1, len(x[0]) - 1] for x in self.freqs_traininputs]
+                test_dim_preds = [[1, len(x[0]) - 1] for x in self.freqs_testinputs]
+                if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
+                    return 'deduced',  train_dim_preds, test_dim_preds
+
+            match_frequency = all([x in y[1] for x, y in zip(self.col_dim_ouputs, self.freqs_traininputs)])
+            if match_frequency:
+                indices = [y[1].index(x) for x, y in zip(self.col_dim_ouputs, self.freqs_traininputs)]
+                if all([x == indices[0] for x in indices]):
+                    train_dim_preds = [[1, x[1][indices[0]]] for x in self.freqs_traininputs]
+                    test_dim_preds = [[1, x[1][indices[0]]] for x in self.freqs_testinputs]
+                    if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
+                        return 'deduced',  train_dim_preds, test_dim_preds
+
+        if self.is_one_col:
+            nonbg_number_train = [len(x[0]) - 1 for x in self.freqs_traininputs]
+            if self.row_dim_ouputs == nonbg_number_train:
+                train_dim_preds = [[len(x[0]) - 1, 1] for x in self.freqs_traininputs]
+                test_dim_preds = [[len(x[0]) - 1, 1] for x in self.freqs_testinputs]
+                if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
+                    return 'deduced',  train_dim_preds, test_dim_preds
+
+            match_frequency = all([x in y[1] for x, y in zip(self.row_dim_ouputs, self.freqs_traininputs)])
+            if match_frequency:
+                indices = [y[1].index(x) for x, y in zip(self.row_dim_ouputs, self.freqs_traininputs)]
+                if all([x == indices[0] for x in indices]):
+                    train_dim_preds = [[x[1][indices[0]], 1] for x in self.freqs_traininputs]
+                    test_dim_preds = [[x[1][indices[0]], 1] for x in self.freqs_testinputs]
+                    if all([x == y for x, y in zip(self.trainoutputs_shapes, train_dim_preds)]):
+                        return 'deduced',  train_dim_preds, test_dim_preds
 
         if self.trainoutput_dims_in_traininputs_objects:
             indices = [x.index(y) for x, y in zip(self.traininput_objects_dims, self.trainoutputs_shapes)]
@@ -304,7 +356,7 @@ class ARCsolver:
         if to_try:
             # print('c')
             current_situation, train_situation, train_screen, test_situation, test_screen = self.try_apply_routines(what_to_try, pass_info)
-            self.applied_checkpoint_results[str(what_to_check)] = (current_situation, train_situation, train_screen, test_situation, test_screen)
+            self.applied_checkpoint_results[str(what_to_try)] = (current_situation, train_situation, train_screen, test_situation, test_screen)
 
             # print(current_situation)
             if current_situation == 'passed_all_testinputs':
@@ -396,19 +448,33 @@ class ARCsolver:
         b = apply_transform_map(a, pass_info)
         return apply_transform_map(b, token_to_col)
 
-    def check_expansions_contractions(self, start = self.traininputs):
+    def check_expansions_contractions(self, start):
         to_pass = {}
         out_in_rel = [convolve_for_a_match(x, y, z) for x, y, z in zip(start, self.trainoutputs, self.what_relation)]
         is_out_in_rel = all([x[0] for x in out_in_rel])
         is_same = all([x[2] == out_in_rel[0][2] for x in out_in_rel])
-        if is_out_in_rel and is_same or self.is_unique_train_outputs:
+
+        if (is_out_in_rel and is_same) or self.is_unique_train_outputs:
             to_pass['scenario'] = out_in_rel[0][2]
             to_pass['arrangements'] = [[j[0] for j in i[1]] for i in out_in_rel]
             to_pass['starts'] = [[j[1] for j in i[1]] for i in out_in_rel]
-            to_pass['is_unique_train_outputs'] = self.is_unique_train_outputs =
+            to_pass['is_unique_train_outputs'] = self.is_unique_train_outputs
             return True, self.apply_expansions_contractions, to_pass
+        elif not is_out_in_rel and not self.is_same_dim_couple and (self.is_sim_int_div or self.is_sim_internal_int_div):
+            is_expanded = (self.is_sim_int_div or self.is_sim_internal_int_div) and  all([int(x[0]) != 0 and int(x[1]) != 0 for x in self.int_div])
+            is_contracted = (self.is_sim_int_div or self.is_sim_internal_int_div) and all([int(1/x[0]) != 0 and int(1/x[1]) != 0 for x in self.int_div])
+
+            if is_expanded:
+                to_pass['is_expanded'] = self.int_div
+            elif is_contracted:
+                to_pass['is_contracted'] = self.int_div
+            to_pass['is_sim_int_div'] = self.is_sim_int_div
+            to_pass['is_sim_internal_int_div'] = self.is_sim_int_div
+
+            return True, self.apply_expansions_contractions, to_pass
+
         return False, '', to_pass
 
     def apply_expansions_contractions(self, in_, pass_info):
-
-        pass
+        #print(pass_info)
+        return
