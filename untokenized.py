@@ -461,6 +461,7 @@ def get_flips_rotation(in_):
     flipped_lr = np.fliplr(in_)
     return [in_, diagonal_mirror, offdiagonal_mirror, rotated90_1, rotated90_2, rotated90_3, flipped_ud, flipped_lr]
 
+
 # There may be some redundancie in the screen_flips_rotation function, no time to gather test cases
 def screen_flips_rotation(in_, out_):
     in_ = fix_dim(in_)
@@ -750,3 +751,71 @@ def supplement_dict(a, b):
         if b[n] not in a.values():
             a[n] = b[n]
     return a
+
+def get_majority(list_of_lists):
+    similar_len0 = all([len(x) == len(list_of_lists[0]) for x in list_of_lists])
+    if similar_len0:
+        candidates = []
+        target_len = len(list_of_lists[0])
+        for n in range(target_len):
+            position_options = [x[n] for x in list_of_lists]
+            position_majority = get_sorted_frequency_situation(fix_dim(position_options))[0][0]
+            candidates.append(position_majority)
+        return candidates
+    return None
+
+def split_list_levels(levels, this_list):
+    if levels == 1:
+        return [this_list]
+    elif len(this_list) % levels == 0:
+        new_list = []
+        splitter = int(len(this_list) / levels)
+        start = 0
+        while(start < len(this_list)):
+            new_list.append(this_list[start:start+splitter])
+            start = start + splitter
+        return new_list
+    else:
+        return None
+
+def expand_arr(in_, helper, determinant):
+    similar_len0 = [len(x) == len(helper[0]) for x in helper]
+    similar_len1 = [len(x) == len(y) for x, y in zip(helper, determinant)]
+    if similar_len0 and similar_len1:
+        target_flips = get_majority(helper)
+        # we need to determine the expansion direction: all horizontal, all vertical, hori/ver
+        all_hori = all([all([x[0] == 0 for x in i]) for i in determinant])
+        all_vert = all([all([x[1] == 0 for x in i]) for i in determinant])
+        expansion_extent = len(determinant[0])
+        in_options = get_flips_rotation(in_)
+        helper = get_majority(helper)
+        if helper != None:
+            selected_in_options = tuple([in_options[y] for y in helper])
+            rows = in_.shape[0]
+            cols = in_.shape[1]
+            if all_hori and helper != None:
+                return np.hstack(selected_in_options)
+            elif all_vert and helper != None:
+                return np.vstack(selected_in_options)
+            elif helper != None:
+                horiz = sum([x[0] == 0 for x in determinant[0]])
+                horiz_options = [i for i in range(len(determinant[0])) if determinant[0][i][0] == 0]
+                if horiz != 0:
+                    vert = int((len(determinant[0]) - horiz)/horiz) + 1
+                    vert_levels = int((len(determinant[0]) - horiz)/horiz)
+                elif horiz == 0:
+                    print('helper:', helper)
+                    print('determinant:', determinant)
+                    return in_
+                vert_options = [i for i in range(len(determinant[0])) if determinant[0][i][0] != 0]
+                vert_options = split_list_levels(vert_levels, vert_options)
+                starter = np.tile(in_, (vert, horiz))
+                rows = in_.shape[0]
+                cols = in_.shape[1]
+                for n in range(horiz):
+                    starter[0:rows, n*cols:(n+1)*cols] = selected_in_options[horiz_options[n]]
+                for n in range(vert_levels):
+                    for m in range(len(vert_options[0])):
+                        starter[(n+1)*rows:(n+2)*rows, m*cols:(m+1)*cols] = selected_in_options[vert_options[n][m]]
+                return starter
+    return in_

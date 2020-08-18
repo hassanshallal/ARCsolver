@@ -128,8 +128,8 @@ class ARCsolver:
         if checkpoint3 == 'halt':
             return
 
-        # We need to get token_to_col and col_to_token for test_input
-        self.cur_x_train, self.cur_x_test = self.get_prior_knowledge()
+        # checkpoint: prior knowledge scenarios
+        # self.cur_x_train, self.cur_x_test = self.get_prior_knowledge()
 
     def assess_bg_situation(self):
         traininputs_bg = [x[0][0] for x in self.freqs_traininputs]
@@ -455,26 +455,54 @@ class ARCsolver:
         is_same = all([x[2] == out_in_rel[0][2] for x in out_in_rel])
 
         if (is_out_in_rel and is_same) or self.is_unique_train_outputs:
-            to_pass['scenario'] = out_in_rel[0][2]
-            to_pass['arrangements'] = [[j[0] for j in i[1]] for i in out_in_rel]
-            to_pass['starts'] = [[j[1] for j in i[1]] for i in out_in_rel]
+            to_pass['situation'] = 'external'
+            to_pass['case'] = out_in_rel[0][2]
+            to_pass['helper'] = [[j[0] for j in i[1]] for i in out_in_rel]
+            to_pass['determinant'] = [[j[1] for j in i[1]] for i in out_in_rel]
             to_pass['is_unique_train_outputs'] = self.is_unique_train_outputs
             return True, self.apply_expansions_contractions, to_pass
+
         elif not is_out_in_rel and not self.is_same_dim_couple and (self.is_sim_int_div or self.is_sim_internal_int_div):
-            is_expanded = (self.is_sim_int_div or self.is_sim_internal_int_div) and  all([int(x[0]) != 0 and int(x[1]) != 0 for x in self.int_div])
-            is_contracted = (self.is_sim_int_div or self.is_sim_internal_int_div) and all([int(1/x[0]) != 0 and int(1/x[1]) != 0 for x in self.int_div])
+            determinant = 'is_sim_int_div' if self.is_sim_int_div else 'is_sim_internal_int_div' if self.is_sim_internal_int_div else None
+            case = 'expansion' if all([int(x[0]) != 0 and int(x[1]) != 0 for x in self.int_div]) else 'contraction' if all([int(1/x[0]) != 0 and int(1/x[1]) != 0 for x in self.int_div]) else None
+            if case != None:
+                to_pass['situation'] = 'internal'
+                to_pass['case'] = case
+                to_pass['determinant'] = determinant
+                if determinant == 'is_sim_int_div':
+                    to_pass['helper'] = self.int_div[0]
+                elif determinant == 'is_sim_internal_int_div':
+                    # here, there is something else that determines the int_div. So far, we know the number of non-background colors can be a factors
+                    if [x[0] for x in self.int_div] == [len(x[0]) - 1 for x in self.freqs_traininputs]:
+                        to_pass['helper'] = 'num_nonbg'
+                    else:
+                        to_pass['helper'] = None
 
-            if is_expanded:
-                to_pass['is_expanded'] = self.int_div
-            elif is_contracted:
-                to_pass['is_contracted'] = self.int_div
-            to_pass['is_sim_int_div'] = self.is_sim_int_div
-            to_pass['is_sim_internal_int_div'] = self.is_sim_int_div
-
-            return True, self.apply_expansions_contractions, to_pass
+                return True, self.apply_expansions_contractions, to_pass
 
         return False, '', to_pass
 
     def apply_expansions_contractions(self, in_, pass_info):
         #print(pass_info)
-        return
+        # this is will be a fucking dirty and nasty function and we won't apologize for it. We are targeting around 128 cases with this checkpoint, this is nasty by default
+        if pass_info['situation'] == 'internal':
+            if pass_info['determinant'] == 'is_sim_int_div':
+                if pass_info['case'] == 'expansion':
+                    return np.repeat(np.repeat(in_, int(pass_info['helper'][0]), 0), int(pass_info['helper'][1]), 1)
+                elif pass_info['case'] == 'contraction':
+                    return in_[::int(1/pass_info['helper'][0]),::int(1/pass_info['helper'][1])]
+            elif pass_info['determinant'] == 'is_sim_internal_int_div':
+                if pass_info['helper'] == 'num_nonbg':
+                    helper = len(get_sorted_frequency_situation(in_)[0]) - 1
+                    if pass_info['case'] == 'expansion':
+                        return np.repeat(np.repeat(in_, helper, 0), helper, 1)
+                    elif pass_info['case'] == 'contraction':
+                        return in_[::int(1/helper),::int(1/helper)]
+                else:
+                    return in_
+        elif pass_info['situation'] == 'external':
+            if pass_info['case'] == 'expansion':
+                print('expansion')
+                return expand_arr(in_, pass_info['helper'], pass_info['determinant'])
+
+        return in_

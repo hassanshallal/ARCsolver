@@ -79,7 +79,6 @@ def neighbor_situation(arr, i, j):
 # the 266 space map may be exteded for 0-9 options, so, we end up with 2660 space
 # how can represent this for each array point
 # We need a code mapping the
-
 def neighbor_situation_whole(maze):
     results = {}
     dim_0 = maze.shape[0]
