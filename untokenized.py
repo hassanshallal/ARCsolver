@@ -459,7 +459,9 @@ def get_flips_rotation(in_):
     rotated90_3 = np.rot90(in_, 3, axes = (0, 1))
     flipped_ud = np.flipud(in_)
     flipped_lr = np.fliplr(in_)
-    return [in_, diagonal_mirror, offdiagonal_mirror, rotated90_1, rotated90_2, rotated90_3, flipped_ud, flipped_lr]
+    transposed = np.transpose(in_)
+
+    return [in_, diagonal_mirror, offdiagonal_mirror, rotated90_1, rotated90_2, rotated90_3, flipped_ud, flipped_lr, transposed]
 
 
 # There may be some redundancie in the screen_flips_rotation function, no time to gather test cases
@@ -480,8 +482,10 @@ def screen_flips_rotation(in_, out_):
         return np.rot90, 3
     elif np.all(np.flipud(in_) == out_):
         return np.flipud, None
-    elif np.all(np.fliplr(in_) == np.array(out_)):
+    elif np.all(np.fliplr(in_) == out_):
         return np.fliplr, None
+    elif np.all(np.transpose(in_) == out_):
+        return np.transpose, None
     else:
         return None, None
 
@@ -779,43 +783,63 @@ def split_list_levels(levels, this_list):
         return None
 
 def expand_arr(in_, helper, determinant):
-    similar_len0 = [len(x) == len(helper[0]) for x in helper]
-    similar_len1 = [len(x) == len(y) for x, y in zip(helper, determinant)]
-    if similar_len0 and similar_len1:
+    # print(in_)
+    # print('helper:', helper)
+    # print('determinant:', determinant)
+    similar_len0 = all([len(x) == len(helper[0]) for x in helper])
+    similar_len1 = all([len(x) == len(y) for x, y in zip(helper, determinant)])
+    possible_expansion = all([len(x) > 1 for x in determinant])
+    # print('similar_len0:', similar_len0, ' similar_len1: ', similar_len1, 'possible_expansion: ', possible_expansion)
+    if similar_len0 and similar_len1 and possible_expansion:
+        # print('a')
         target_flips = get_majority(helper)
-        # we need to determine the expansion direction: all horizontal, all vertical, hori/ver
+        # print('target_flips:', target_flips)
+        #we need to determine the expansion direction: all horizontal, all vertical, hori/ver
         all_hori = all([all([x[0] == 0 for x in i]) for i in determinant])
         all_vert = all([all([x[1] == 0 for x in i]) for i in determinant])
         expansion_extent = len(determinant[0])
         in_options = get_flips_rotation(in_)
+        # print('all_hori:', all_hori, 'all_vert:', all_vert, 'expansion_extent:', expansion_extent)
         helper = get_majority(helper)
+        # print('helper:', helper)
         if helper != None:
             selected_in_options = tuple([in_options[y] for y in helper])
             rows = in_.shape[0]
             cols = in_.shape[1]
             if all_hori and helper != None:
+                # print('all_hori')
                 return np.hstack(selected_in_options)
             elif all_vert and helper != None:
+                # print('all_vert')
                 return np.vstack(selected_in_options)
             elif helper != None:
+                # print('both hori and vert')
                 horiz = sum([x[0] == 0 for x in determinant[0]])
                 horiz_options = [i for i in range(len(determinant[0])) if determinant[0][i][0] == 0]
+                # print('horiz:', horiz, ' horiz_options: ', horiz_options)
                 if horiz != 0:
                     vert = int((len(determinant[0]) - horiz)/horiz) + 1
                     vert_levels = int((len(determinant[0]) - horiz)/horiz)
+                    # print('vert:', vert, ' vert_levels: ', vert_levels)
                 elif horiz == 0:
-                    print('helper:', helper)
-                    print('determinant:', determinant)
+                    # print('helper:', helper)
+                    # print('determinant:', determinant)
                     return in_
                 vert_options = [i for i in range(len(determinant[0])) if determinant[0][i][0] != 0]
+                # print('vert_options before:', vert_options)
                 vert_options = split_list_levels(vert_levels, vert_options)
+                # print('vert_options after:', vert_options)
                 starter = np.tile(in_, (vert, horiz))
                 rows = in_.shape[0]
                 cols = in_.shape[1]
+                # print('starter before anything:', starter)
                 for n in range(horiz):
                     starter[0:rows, n*cols:(n+1)*cols] = selected_in_options[horiz_options[n]]
+                    # print('starter within horiz:', starter)
                 for n in range(vert_levels):
                     for m in range(len(vert_options[0])):
                         starter[(n+1)*rows:(n+2)*rows, m*cols:(m+1)*cols] = selected_in_options[vert_options[n][m]]
+                        # print('n:', n, ' m: ', m)
+                        # print('starter within horiz vert_levels:', starter)
                 return starter
     return in_

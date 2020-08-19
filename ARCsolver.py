@@ -357,7 +357,6 @@ class ARCsolver:
             # print('c')
             current_situation, train_situation, train_screen, test_situation, test_screen = self.try_apply_routines(what_to_try, pass_info)
             self.applied_checkpoint_results[str(what_to_try)] = (current_situation, train_situation, train_screen, test_situation, test_screen)
-
             # print(current_situation)
             if current_situation == 'passed_all_testinputs':
                 # print('d')
@@ -387,8 +386,8 @@ class ARCsolver:
 
         train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
         # print('f')
-        if all(train_screen):
-            current_situation = 'passed_all_traininputs'
+        if any(train_screen):
+            current_situation = 'passed_some_traininputs'
             if apply_routine == self.apply_simple_tokenized_transforms:
                 test_situation = [apply_routine(x, y, pass_info, z) for x, y, z in zip(test_situation, self.col_to_token_testinputs, self.token_to_col_testinputs)]
             else:
@@ -402,9 +401,6 @@ class ARCsolver:
                     current_situation = 'passed_some_testinputs'
                 else:
                     current_situation = 'unpassed_all_testinputs'
-        elif all(train_screen) == False and any(train_screen):
-            current_situation = 'passed_some_traininputs'
-
         else:
             current_situation = 'unpassed_all_traininputs'
 
@@ -502,7 +498,6 @@ class ARCsolver:
                     return in_
         elif pass_info['situation'] == 'external':
             if pass_info['case'] == 'expansion':
-                print('expansion')
+                # print('expansion')
                 return expand_arr(in_, pass_info['helper'], pass_info['determinant'])
-
         return in_
