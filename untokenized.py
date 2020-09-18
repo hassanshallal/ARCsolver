@@ -149,9 +149,24 @@ def plot_task_eval(task, testpreds):
 
     norm = colors.Normalize(vmin=0, vmax=9)
     train_len = len(task['train'])
+
+    if not is_list_of_list(testpreds):
+        testpreds = [x.astype('int64') for x in testpreds]
+    else:
+        multiply = len(testpreds[0])
+
+        testpreds = list(itertools.chain.from_iterable(testpreds))
+        testpreds = [x.astype('int64') for x in testpreds]
+
+        new_test = []
+        for n in range(len(task['test'])):
+            for m in range(multiply):
+                new_test.append(task['test'][n])
+        task['test'] = new_test
+
     test_len = len(task['test'])
-    #print('train_len: ', train_len, ' test_len: ', test_len)
     fig_dim = 0
+
     if type(testpreds) == list and len(testpreds)  > 0:
         fig_dim = train_len*2 + test_len*3
     elif type(testpreds) == list and len(testpreds)  == 0:
@@ -192,6 +207,11 @@ def get_background(arr):
     max_index = counts.index(max(counts))
     return vals[max_index]
 
+def is_list_of_list(this_list):
+    if len(this_list) > 0 and len(this_list[0]) > 0:
+        return type(this_list) == list and type(this_list[0]) == list
+    else:
+        return False
 ## first principles prior knowledge encoding
 def list_comparator(l1, l2):
     if len(l1) == len(l2):
@@ -800,19 +820,23 @@ def expand_arr(in_, helper, determinant):
         expansion_extent = len(determinant[0])
         in_options = get_flips_rotation(in_)
         # print('all_hori:', all_hori, 'all_vert:', all_vert, 'expansion_extent:', expansion_extent)
-        helper = get_majority(helper)
+        # helper = get_majority(helper)
+
+        helper = [list(x) for x in list(set([tuple(x) for x in helper]))]
+
+        preds = []
         # print('helper:', helper)
-        if helper != None:
-            selected_in_options = tuple([in_options[y] for y in helper])
+        for this_helper in helper:
+            selected_in_options = tuple([in_options[y] for y in this_helper])
             rows = in_.shape[0]
             cols = in_.shape[1]
-            if all_hori and helper != None:
+            if all_hori: # and helper != None
                 # print('all_hori')
-                return np.hstack(selected_in_options)
-            elif all_vert and helper != None:
+                preds.append(np.hstack(selected_in_options))
+            elif all_vert: # and helper != None
                 # print('all_vert')
-                return np.vstack(selected_in_options)
-            elif helper != None:
+                preds.append(np.vstack(selected_in_options))
+            else: # elif helper != None
                 # print('both hori and vert')
                 horiz = sum([x[0] == 0 for x in determinant[0]])
                 horiz_options = [i for i in range(len(determinant[0])) if determinant[0][i][0] == 0]
@@ -841,5 +865,6 @@ def expand_arr(in_, helper, determinant):
                         starter[(n+1)*rows:(n+2)*rows, m*cols:(m+1)*cols] = selected_in_options[vert_options[n][m]]
                         # print('n:', n, ' m: ', m)
                         # print('starter within horiz vert_levels:', starter)
-                return starter
+                preds.append(starter)
+        return preds
     return in_

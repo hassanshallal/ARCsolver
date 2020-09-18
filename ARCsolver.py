@@ -97,7 +97,7 @@ class ARCsolver:
         # tokenize, collect transformation and tokenized_transformation graphs (there are decisions made on the fly here)
         self.col_to_token_inputs = [get_freq_dict_in_(x[0], y) for x, y in zip(self.freqs_traininputs, self.traininputs_bg)]
         self.col_to_token_testinputs = [get_freq_dict_in_(x[0], y) for x, y in zip(self.freqs_testinputs, self.testinputs_bg)]
-        self.col_to_token_inputs, self.col_to_token_testinputs= self.massage_input_dicts()
+        self.col_to_token_inputs, self.col_to_token_testinputs = self.massage_input_dicts()
         self.col_to_token_outputs = [get_freq_dict_out_(x[0], y) for x, y in zip(self.freqs_trainoutputs, self.col_to_token_inputs)]
         self.col_to_token_inputs = [supplement_dict(x, y) for x, y in zip(self.col_to_token_inputs, self.col_to_token_outputs)]
 
@@ -368,9 +368,7 @@ class ARCsolver:
         return  'continue'
 
     def try_apply_routines(self, apply_routine, pass_info): # apply routine must work on in_ and pass_info
-        # print('e')
-        # print('apply_routine:', apply_routine)
-        # print('pass_info:', pass_info)
+
         current_situation = 'screening ' + str(apply_routine)
         train_situation = deepcopy(self.cur_train_preds)
         train_options = [(None, None)] * len(train_situation)
@@ -384,7 +382,10 @@ class ARCsolver:
         else:
             train_situation = [apply_routine(x, pass_info) for x in train_situation]
 
-        train_screen = [np.array_equal(x, y) for x, y in zip(train_situation, self.trainoutputs)]
+        if not is_list_of_list(train_situation):
+            train_screen = [np.array_equal(x, y) for x, y in zip(self.trainoutputs, train_situation)]
+        else:
+            train_screen = [any([np.array_equal(x, z) for z in y]) for x, y in zip(self.trainoutputs, train_situation)]
         # print('f')
         if any(train_screen):
             current_situation = 'passed_some_traininputs'
@@ -394,13 +395,19 @@ class ARCsolver:
                 test_situation = [apply_routine(x, pass_info) for x in test_situation]
 
             if len(self.testoutputs) > 0:
-                test_screen = [np.array_equal(x, y) for x, y in zip(test_situation, self.testoutputs)]
+                if not is_list_of_list(test_situation):
+                    test_screen = [np.array_equal(x, y) for x, y in zip(self.testoutputs, test_situation)]
+                else:
+                    test_screen = [any([np.array_equal(x, z) for z in y]) for x, y in zip(self.testoutputs, test_situation)]
+
+
                 if all(test_screen):
                     current_situation = 'passed_all_testinputs'
                 elif all(test_screen) == False and any(test_screen):
                     current_situation = 'passed_some_testinputs'
                 else:
                     current_situation = 'unpassed_all_testinputs'
+
         else:
             current_situation = 'unpassed_all_traininputs'
 
